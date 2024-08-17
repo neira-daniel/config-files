@@ -1,149 +1,419 @@
-;;; init.el -*- lexical-binding: t; -*-
+;; Inicialización o actualización de variables
+;;   - nombre de usuario
+(setq user-full-name "Daniel Neira")
+;;   - directorio de inicio (el que aparecerá al presionar C-x C-f por primera vez)
+;;     - debe estar ubicado en el directorio personal del usuario
+;;       - C:\Users\{username} en Windows
+;;       - ${HOME} en los demás sistemas operativos
+;;     - si no existe, será creado
+(setq dn/starting-folder "org-vault")
 
-;; straight.el bootstrapping
+;; función auxiliar
+(defun dn/string-match-p (REGEXP STRING)
+  " Wrapper para string-match-p que devuelve t cuando
+hay coincidencia y nil cuando no."
+  (if (string-match-p REGEXP STRING)
+      t
+    nil))
 
+;; obtención del sistema operativo que aloja Emacs
+;; (defconst IS-WSL     (and (eq system-type 'gnu/linux)
+;; (dn/string-match-p "Microsoft"
+;; (shell-command-to-string "uname -a"))))
+;; (defconst IS-LINUX   (and (not IS-WSL)
+;; (eq system-type 'gnu/linux)))
+(defconst ON-MAC     (eq system-type 'darwin))
+(defconst ON-LINUX   (eq system-type 'gnu/linux))
+;; asumimos que trabajamos con, al menos, Windows Vista
+(defconst ON-WINDOWS (eq system-type 'windows-nt))
+(defconst ON-WSL     (and (string-match-p "Microsoft" operating-system-release)
+			  ON-LINUX))
+
+;; obtención de la versión de Emacs
+(defconst EMACS27+   (> emacs-major-version 26))
+(defconst EMACS28+   (> emacs-major-version 27))
+(defconst EMACS29+   (> emacs-major-version 28))
+
+;;; init.el -*- coding: utf-8-unix; -*- lexical-binding: t; -*-
+
+;; bootstraping straight.el de acuerdo al manual
+;; ver GH·radian-software/straight.el
 (defvar bootstrap-version)
 (let ((bootstrap-file
-       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-      (bootstrap-version 5))
+       (expand-file-name
+        "straight/repos/straight.el/bootstrap.el"
+        (or (bound-and-true-p straight-base-dir)
+            user-emacs-directory)))
+      (bootstrap-version 7))
   (unless (file-exists-p bootstrap-file)
     (with-current-buffer
         (url-retrieve-synchronously
-         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+         "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
          'silent 'inhibit-cookies)
       (goto-char (point-max))
       (eval-print-last-sexp)))
   (load bootstrap-file nil 'nomessage))
 
-;; straight.el and use-package integration
-
+;; instalación de use-package
 (straight-use-package 'use-package)
-(setq straight-use-package-by-default t)
 
-;; Emacs major version and host operating system identification
+;; configuramos use-package para que siempre instale paquetes con straight.el
+(use-package straight
+  :custom
+  (straight-use-package-by-default t))
 
-(defconst EMACS27+   (> emacs-major-version 26))
-(defconst EMACS28+   (> emacs-major-version 27))
-(defconst IS-MAC     (eq system-type 'darwin))
-(defconst IS-LINUX   (eq system-type 'gnu/linux))
-(defconst IS-WINDOWS (memq system-type '(cygwin windows-nt ms-dos)))
-(defconst IS-BSD     (or IS-MAC (eq system-type 'berkeley-unix)))
+;; configuración de Evil
+(use-package evil
+  :init
+  ;; https://evil.readthedocs.io/en/latest/settings.html
+  (setq evil-vsplit-window-right t
+	evil-split-window-below t
+	evil-undo-system 'undo-fu)
+  ;; desactivamos C-i para que TAB funcione en la terminal
+  (setq evil-want-C-i-jump nil)
+  :config
+  ;; definición de la tecla <leader>
+  (evil-set-leader 'normal (kbd "SPC"))
+  ;; guardar el archivo con w
+  (evil-define-key 'normal 'global (kbd "<leader>w") 'save-buffer)
+  ;; utilizar U para deshacer un cambio (notemos que U cumple otra función en Vim y aquí la estamos sobreeescribiendo)
+  (evil-define-key 'normal 'global (kbd "U") 'evil-redo)
+  ;; borrar desde el cursor hasta el comienzo de la línea sin modificar los registros
+  (evil-define-key 'normal 'global (kbd "C-<backspace>") (kbd "\"_d0"))
+  (evil-define-key 'insert 'global (kbd "C-<backspace>") (kbd "C-o \" _ d 0"))
+  ;; ir al siguiente buffer
+  (evil-define-key 'normal 'global (kbd "<leader>o") (kbd "C-x o"))
+  ;; activar evil-mode
+  (evil-mode 1))
 
-;; Unix tools look for HOME, but this is normally not defined on Windows
+;; configuración de evil-org
+(use-package evil-org
+  :after (evil org)
+  :hook (org-mode . evil-org-mode)
+  :config
+  (evil-org-set-key-theme '(textobjects additional return todo)))
 
-(when (and IS-WINDOWS (null (getenv "HOME")))
-  (setenv "HOME" (getenv "USERPROFILE")))
+;; configuración de evil-surround
+(use-package evil-surround
+  :config
+  (global-evil-surround-mode 1))
 
-;; set startup default directory as $HOME
+;; configuración de evil-exchange
+(use-package evil-exchange
+  :init
+  (let ((evil-exchange-key (kbd "gx"))
+      (evil-exchange-cancel-key (kbd "gX")))
+    (define-key evil-normal-state-map evil-exchange-key 'evil-exchange)
+    (define-key evil-visual-state-map evil-exchange-key 'evil-exchange)
+    (define-key evil-normal-state-map evil-exchange-cancel-key 'evil-exchange-cancel)
+    (define-key evil-visual-state-map evil-exchange-cancel-key 'evil-exchange-cancel)))
 
-(setq inhibit-startup-message t)
-(setq default-directory (file-name-as-directory (getenv "HOME")))
+;; configuración de evil-unimpaired
+(use-package evil-unimpaired
+  :straight
+  (evil-unimpaired :type git
+                   :host github :repo "zmaas/evil-unimpaired")
+  :config
+  (evil-unimpaired-mode))
 
-;; set the Emacs custom file (create one if it doesn't exist) and load it
+;; configuración de evil-terminal-cursor-changer
+(unless (display-graphic-p)
+  (use-package evil-terminal-cursor-changer
+    :config
+    (evil-terminal-cursor-changer-activate)))
 
-(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
-(when (file-exists-p custom-file)
-  (load custom-file))
+;; configuración de evil-owl
+(use-package evil-owl
+  :config
+  (setq evil-owl-max-string-length 500)
+  (add-to-list 'display-buffer-alist
+               '("*evil-owl*"
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.3)))
+  (evil-owl-mode))
 
-;; start the week on Monday
+;; configuración de undo-fu
+(use-package undo-fu
+  :after (evil)
+  :config
+  (setq undo-fu-ignore-keyboard-quit t)
+  (global-set-key (kbd "M-z")   'undo-fu-only-undo)
+  (global-set-key (kbd "M-S-z") 'undo-fu-only-redo))
 
-(setq calendar-week-start-day 1)
+;; configuración de yasnippet
+(use-package yasnippet
+  :init
+  (yas-global-mode 1)
+  :config
+  (add-to-list #'yas-snippet-dirs (locate-user-emacs-file "snippets")))
 
-;; Contrary to what many Emacs users have in their configs, you really don't
-;; need more than this to make UTF-8 the default coding system:
-
-(when (fboundp 'set-charset-priority)
-  (set-charset-priority 'unicode))       ; pretty
-(prefer-coding-system 'utf-8)            ; pretty
-(setq locale-coding-system 'utf-8)       ; please
-
-;; The clipboard's on Windows could be in a wider (or thinner) encoding than
-;; utf-8 (likely UTF-16), so let Emacs/the OS decide what encoding to use there.
-
-(unless IS-WINDOWS
-  (setq selection-coding-system 'utf-8)) ; with sugar on top
-
-;; minibuffer completion assistant
-
+;; configuración de Ivy
 (use-package ivy
   :config
   (ivy-mode 1)
-  (setq ivy-use-virtual-buffers t)
+  ;;(setq ivy-use-virtual-buffers t)
   (setq ivy-count-format "(%d/%d) "))
 
-;; better search function
-
-(use-package swiper
-  :after (ivy)
+;; configuración de which-key
+(use-package which-key
   :config
-  (setq ivy-wrap t)
-  ;; :commands + :init -> :bind with conditionals
-  :commands
-  swiper-isearch
-  :init
-  (if IS-MAC
-      (bind-key "s-f" 'swiper-isearch)
-    (bind-key "C-f" 'swiper-isearch)))
+  (setq echo-keystrokes 0.4)
+  (which-key-mode 1))
 
-;; change loading order preference (.elc, and then .el) to whichever file is newer
-
-(setq load-prefer-newer t)
-
-;; keep a list of recently opened files for easy access
-
+;; configuración de recentf
 (use-package recentf
   :config
   (recentf-mode 1)
   (setq recentf-max-menu-items 10)
   (setq recentf-max-saved-items 15)
   :bind
-  ("C-x C-r" . recentf-open-files))
+  ("C-c r" . recentf-open-files))
 
-;; configuration of undo-fu: undo and redo that make sense
+;; configuración de emacs-leuven-theme
+(use-package leuven-theme
+  ;; :config
+  ;; (load-theme 'leuven t)
+  )
 
-(use-package undo-fu
-  :after (evil)  ;; tuve que agregarlo 20200314
+(use-package doom-themes
   :config
-  (setq undo-fu-ignore-keyboard-quit t)
+  ;; Global settings (defaults)
+  (setq doom-themes-enable-bold t    ; if nil, bold is universally disabled
+        doom-themes-enable-italic t) ; if nil, italics is universally disabled
+  ;; (load-theme 'doom-city-lights t)
 
-;;  (global-undo-tree-mode -1)
-;;  (define-key evil-normal-state-map "u" 'undo-fu-only-undo)
-;;  (define-key evil-normal-state-map "\C-r" 'undo-fu-only-redo)
+  ;; Enable flashing mode-line on errors
+  (doom-themes-visual-bell-config)
+  ;; Corrects (and improves) org-mode's native fontification.
+  (doom-themes-org-config))
 
-  :bind
-  ("s-z" . undo-fu-only-undo)
-  ("s-Z" . undo-fu-only-redo)
-  ("s-y" . undo-fu-only-redo))
+(use-package solaire-mode
+  :after (doom-themes))
 
-;; disable the bell ring and the visual aid
+(use-package ample-theme
+  :init
+  (load-theme 'ample t t)
+  (load-theme 'ample-flat t t)
+  (load-theme 'ample-light t t)
+  ;; (enable-theme 'ample-flat)
+  )
 
+;; función auxiliar
+(defun activate-olivetti-mode ()
+  (olivetti-mode 1))
+;; configuración de olivetti
+(use-package olivetti
+  :init
+  (setq olivetti-body-width 86)
+  :hook
+  (text-mode . activate-olivetti-mode))
+
+;; configuración de ws-butler
+(use-package ws-butler
+  :straight
+  (ws-butler :type git
+             :host github :repo "lewang/ws-butler"
+             :fork (:host github :repo "hlissner/ws-butler"))
+  :commands
+  ;; ¿será necesario activarlo si luego lo engancho con hook?
+  (ws-butler-mode)
+  :hook
+  ((prog-mode text-mode) . ws-butler-mode))
+
+;; - actualizar propiedad de documento Org
+(defun dn/update-org-property (property-regex property-new-value)
+  " Replaces first match of property-regex value with property-new-value.
+It only works in Org-mode."
+  (when (eq major-mode 'org-mode)
+    (save-excursion
+      (widen)
+      (goto-char (point-min))
+      (when (re-search-forward property-regex (point-max) t)
+        (progn
+          ;;(kill-line) guardaría la timestamp en el kill-ring
+	  ;;(delete-region a b) no lo hace
+	  ;; https://stackoverflow.com/a/21780995
+	  ;; alt: https://unix.stackexchange.com/a/136581
+	  (delete-region (point) (line-end-position))
+          (insert (concat " " property-new-value))
+          )))))
+
+(defun dn/update-org-last-modified ()
+  " Updates the value of LAST_MODIFIED with current timestamp."
+  (interactive)
+  ;; desactivamos undo de manera momentánea
+  ;; fuente: https://emacs.stackexchange.com/a/4222
+  (let (buffer-undo-list)
+    (dn/update-org-property "^#\\+LAST_MODIFIED:"
+			    (format-time-string "%Y-%m-%dT%H:%M:%S%:z"))))
+
+;; borrar enlace de documento Org
+;; fuente: https://emacs.stackexchange.com/a/10714
+(defun afs/org-replace-link-by-link-description ()
+  "Replace an Org link by its description or, if empty, its address."
+  (interactive)
+  (if (org-in-regexp org-link-bracket-re 1)
+      (save-excursion
+        (let ((remove (list (match-beginning 0) (match-end 0)))
+              (description
+               (if (match-end 2)
+                   (org-match-string-no-properties 2)
+                 (org-match-string-no-properties 1))))
+          (apply 'delete-region remove)
+          (insert description)))))
+
+;; configuración de Org-mode
+(use-package org
+  :defer t
+  :config
+  ;; go back to old (pre-Org 9.4) org-return behaviour (see Org 9.4 release notes)
+  ;;(add-hook 'org-mode-hook 'deactivate-electric-indent-local-mode)
+  ;; Org initial visibility: global settings
+  ;;   local +STARTUP alternatives:
+  ;;     'overview', 'content', 'showall', 'show2levels', . . ., 'show5levels', 'showeverything'
+  (setq org-startup-folded 'content)
+  ;; Org indent mode: global settings
+  ;;   local +STARTUP alternatives: 'indent' and 'noindent'
+  ;;   note that +STARTUP 'indent' leaves 'hidestars' redundant and has precedence over 'showstars'
+  (setq org-startup-indented t)
+  ;; always leave an empty line between collapsed headers
+  (setq org-cycle-separator-lines 1)
+  ;; activate speed commands on headers
+  ;; also: special shortcuts on headers and lists
+  ;; (note that all these work in Insert "mode" only)
+  (setq org-use-speed-commands t
+	org-special-ctrl-a/e t
+	org-special-ctrl-k t
+	org-ctrl-k-protect-subtree 'error)
+  ;; use a curved arrow instead of 3 dots to signal an invisible region
+  (setq org-ellipsis " ⤵")
+  ;; don't underline the org-ellipsis character(s)
+  (set-face-attribute 'org-ellipsis nil :underline nil)
+  ;; deal with edits on invisible regions in a smart way
+  (setq org-catch-invisible-edits 'show-and-error)
+  ;; never hide the emphasis markers (for example, slashes for italics)
+  (setq org-hide-emphasis-markers nil)
+  ;; how to display LaTeX images (math)
+  ;; C-c C-x C-l (org-latex-preview) <-- show/hide equation next to point
+  ;; C-u C-c C-x C-l <-- show/hide equations in current section
+  ;; C-u C-u C-c C-x C-l <-- show/hide equations in the current document
+  (setq org-format-latex-options (plist-put org-format-latex-options :scale 1.8)
+	org-format-latex-options (plist-put org-format-latex-options :foreground "Black")
+	org-format-latex-options (plist-put org-format-latex-options :background "White")
+	org-format-latex-options (plist-put org-format-latex-options :html-foreground "Black")
+	org-format-latex-options (plist-put org-format-latex-options :html-background "Transparent")
+	org-format-latex-options (plist-put org-format-latex-options :html-scale 1.0))
+  ;; bypass org-babel confirmation when evaluating the listed languages
+  (defun ryuslash/org-confirm-babel-evaluate (lang body)
+    (not (member lang '("R"))))
+  (setq org-confirm-babel-evaluate #'ryuslash/org-confirm-babel-evaluate)
+  ;; tell org-babel which languages it should be aware of
+  ;; nil para desactivar, t para activar
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((R . nil)
+     (emacs-lisp . t)))
+  ;;  :bind
+  ;;  (:map org-mode-map
+  ;;        ("C-a" . org-beginning-of-line)
+  ;;        ("C-e" . org-end-of-line)
+  ;;        ("C-k" . org-kill-line))
+  ;;(put 'org-mode 'flyspell-mode-predicate 'org-mode-flyspell-verify)
+  ;; reloj de Org mode
+  (evil-define-key 'normal 'global (kbd "<leader>ci") 'org-clock-in)
+  (evil-define-key 'normal 'global (kbd "<leader>co") 'org-clock-out)
+  (evil-define-key 'normal 'global (kbd "<leader>cl") 'org-clock-in-last)
+  (evil-define-key 'normal 'global (kbd "<leader>cs") 'org-clock-display)
+  :hook
+  ;;(org-mode . flyspell-mode)
+  (before-save . dn/update-org-last-modified))
+
+(setq inhibit-startup-message t)
+
+;;; Encodings
+;; Contrary to what many Emacs users have in their configs, you don't need more
+;; than this to make UTF-8 the default coding system:
+(set-language-environment 'utf-8)
+;; ...but `set-language-environment' also sets `default-input-method', which is
+;; a step too opinionated.
+;; (setq default-input-method nil)
+;; ...And the clipboard on Windows could be in a wider encoding (UTF-16), so
+;; leave Emacs to its own devices there.
+;;(eval-when! (not doom--system-windows-p)
+;;  (setq selection-coding-system 'utf-8))
+(setq selection-coding-system 'utf-8)
+
+;; Emacs en Windows puede comportarse distinto en cuanto a los saltos de línea
+;; buscamos que prefiera utf8 con LF de unix
+;; https://emacs.stackexchange.com/a/75782
+(prefer-coding-system 'utf-8-unix)
+;;(setq coding-system-for-read 'utf-8-unix)
+;;(setq coding-system-for-write 'utf-8-unix)
+
+;; http://xahlee.info/emacs/emacs/emacs_file_encoding.html
+;; http://xahlee.info/emacs/emacs/emacs_encoding_decoding_faq.html
+;;(set-language-environment 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-keyboard-coding-system 'utf-8-unix)
+;; add this especially on Windows, else python might show output problems
+(set-terminal-coding-system 'utf-8-unix)
+
+;; desactivar el guardado automático de archivos
+;; quienes no acostumbren guardar su trabajo periódicamente preferirán
+;; no cambiar el valor de esta variable
+(setq auto-save-default nil)
+
+;; desactivar la protección contra colisiones
+;; estos son los archivos con los caracteres ".#" en su nombre
+(setq create-lockfiles nil)
+
+;; desactivar la creación de archivos de respaldo
+;; estos son los archivos con caracter "~" al final de su nombre
+(setq make-backup-files nil)
+
+;; configurar el directorio de inicio
+;;   función auxiliar para subir en la jerarquía de directorios
+(defun cb/parent-directory (dir)
+  " Ruta al directorio padre de `dir'.
+Fuente: https://stackoverflow.com/a/14096693"
+  (unless (equal "/" dir)
+    (file-name-directory (directory-file-name dir))))
+;;   asignación de `dn/my-home' dependiendo del sistema operativo anfitrión
+(if ON-WINDOWS
+    (setq dn/my-home (cb/parent-directory (cb/parent-directory (getenv "HOME"))))
+  (setq dn/my-home (file-name-as-directory (getenv "HOME"))))
+;;   asignación del directorio de inicio (si no existe, lo creamos)
+(let ((temp-dir (expand-file-name
+		 (file-name-as-directory dn/starting-folder)
+		 (file-name-as-directory dn/my-home))))
+  (unless (file-directory-p temp-dir)
+    (make-directory temp-dir))
+  (setq default-directory temp-dir))
+
+;; fijamos el archivo secundario de configuraciones y, si existe, lo cargamos
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(when (file-exists-p custom-file)
+  (load custom-file))
+
+;; desactivar la campana
 (setq ring-bell-function #'ignore
       visible-bell nil)
 
-;; I'm in charge with saving my work, so don't autosave, please
+;; activar el ajuste de línea en buffers de texto
+(add-hook 'text-mode-hook #'turn-on-visual-line-mode)
 
-(setq auto-save-default nil)
-
-;; if there's no chance that 2+ people edit the same
-;; file at the same time with Emacs, there's no point
-;; in having this option active, so we set it with nil
-
-(setq create-lockfiles nil)
-
-;; don't backup visited files
-
-(setq make-backup-files nil)
-
-;;; Scrolling
-
+;; desactivar el centrado automático de la pantalla
 (setq hscroll-margin 2
       hscroll-step 1
       ;; Emacs spends too much effort recentering the screen if you scroll the
       ;; cursor more than N lines past window edges (where N is the settings of
       ;; `scroll-conservatively'). This is especially slow in larger files
       ;; during large-scale scrolling commands. If kept over 100, the window is
-      ;; never automatically recentered.
-      scroll-conservatively 101
+      ;; never automatically recentered. The default (0) triggers this too
+      ;; aggressively. Setting it to 10 will trigger recenter if scrolling too far
+      ;; off-screen.
+      scroll-conservatively 10
       scroll-margin 0
       scroll-preserve-screen-position t
       ;; Reduce cursor lag by a tiny bit by not auto-adjusting `window-vscroll'
@@ -153,363 +423,113 @@
       mouse-wheel-scroll-amount '(5 ((shift) . 2))
       mouse-wheel-progressive-speed nil)  ; don't accelerate scrolling
 
-;; Don't stretch the cursor to fit wide characters, it is disorienting,
-;; especially for tabs.
-
-(setq x-stretch-cursor nil)
-
-;; Show current key-sequence in minibuffer ala 'set showcmd' in vim. Any
-;; feedback after typing is better UX than no feedback at all.
-
-(setq echo-keystrokes 0.4)
-
-;; Save keystrokes when answering yes or no questions
-
-(advice-add #'yes-or-no-p :override #'y-or-n-p)
-
-;; when dividing the screen put windows on top of each other
-
-(setq split-width-threshold nil)
-
-;; Emacs "updates" its ui more often than it needs to, so we slow it down
-;; slightly from 0.5s:
-
-(setq idle-update-delay 1.0)
-
-;; set font: working solution for emacsclient and emacs instances
-
-(defvar nox/fonts '(("Menlo" . 18)
-                    ("DejaVu Sans Mono" . 12)
-                    ("Hack" . 11)
-                    ("Inconsolata" . 13)
-                    ("Source Code Pro" . 11))
-  "List of fonts and sizes. The first one available will be used.")
-
-(defun nox/change-font ()
-  (interactive)
-  (let* (available-fonts font-name font-size font-setting)
-    (dolist (font nox/fonts (setq available-fonts (nreverse available-fonts)))
-      (when (member (car font) (font-family-list))
-        (push font available-fonts)))
-                                        ; if: si no se encontró la fuente requerida
-    (if (not available-fonts)
-        (error "No fonts from the chosen set are available")
-                                        ; else: sí se encontró la fuente
-                                        ;   nested if: si la llamada fue interactiva
-      (if (called-interactively-p 'interactive)
-          (let* ((chosen (assoc-string (completing-read "What font to use? " available-fonts nil t) available-fonts)))
-            (setq font-name (car chosen)
-                  font-size (read-number "Font size: " (cdr chosen))))
-                                        ;    nested else: llamada no interactiva; guardar nombre/tamaño de fuente por separado
-        (setq font-name (caar available-fonts)
-              font-size (cdar available-fonts)))
-                                        ; armar el string nombre-tamaño (por ejemplo, "Menlo-16")
-      (setq font-setting (format "%s-%d" font-name font-size))
-                                        ; configurar la fuente
-      (set-frame-font font-setting nil t)
-      (add-to-list 'default-frame-alist (cons 'font font-setting)))))
-
-(defun nox/setup-font (frame)
-  (with-selected-frame frame
-    (remove-hook 'after-make-frame-functions 'nox/setup-font)
-    (nox/change-font)))
-
-;; original
-;;(if (daemonp)
-;;    (add-hook 'after-make-frame-functions 'nox/setup-font)
-;;  (nox/setup-font (car (frame-list))))
-;; nuevo, pero falta corregirlo:
-;; -> uno podría ejecutar Emacs en un terminal conectada
-;; al daemon (en cuyo caso, if daemonp == TRUE se caerá porque
-;; terminal no tiene las fuentes de las funciones NOX
-(if (daemonp)
-    (add-hook 'after-make-frame-functions 'nox/setup-font)
-  (if (display-graphic-p)
-      (nox/setup-font (car (frame-list)))))
-
-;; show file path in the frame title (top bar in GUI)
-
-(setq frame-title-format '((:eval (if (buffer-file-name)
-                                      (abbreviate-file-name (buffer-file-name))
-                                    "%b"))))
-
-;; show all the completions available for an entered command prefix
-
-(use-package which-key
-  :config
-  (which-key-mode 1))
-
-;; winner-mode: restore window configurations
-
-(when (fboundp 'winner-mode)
-  (winner-mode 1))
-
-;; unbind right-ALT from Emacs
-
-(when IS-MAC
-  (setq ns-right-alternate-modifier 'none))
-
-;; kill from point (the cursor) to the left with C-<backspace>
-
-(global-set-key (kbd "C-<backspace>") (lambda ()
-                                        (interactive)
-                                        (kill-line 0)))
+;; activar winner-mode
+(winner-mode 1)
 
 ;; don't kill a region with C-w unless it is highlighted
-
 (defun nerfed-kill ()
   (interactive)
   (if (use-region-p)
       (kill-region (region-begin) (region-end))))
 (global-set-key (kbd "C-w") 'nerfed-kill)
 
-;; allow to overwrite selection
+;; unbind right-ALT from Emacs
+(when ON-MAC
+  (setq ns-right-alternate-modifier 'none))
 
-(delete-selection-mode t)
-
-;; line-wrap in all text files
-
-(add-hook 'text-mode-hook #'turn-on-visual-line-mode)
-
-;; indent with spaces
-
-(setq-default indent-tabs-mode nil)
-(setq-default tab-width 4)
-
-(use-package ws-butler
-  :straight
-  (ws-butler :type git
-             :host github :repo "lewang/ws-butler"
-             :fork (:host github :repo "hlissner/ws-butler"))
-  :commands
-  (ws-butler-mode)
-  :hook
-  ((prog-mode text-mode) . ws-butler-mode))
+;; ocultar la barra de herramientas de la GUI
+(tool-bar-mode -1)
 
 ;; zoom in/out text with the keyboard
-
-(if IS-MAC
+(if ON-MAC
     (progn
       (global-set-key (kbd "s-+") 'text-scale-increase)
       (global-set-key (kbd "s--") 'text-scale-decrease))
   (global-set-key (kbd "C-+") 'text-scale-increase)
   (global-set-key (kbd "C--") 'text-scale-decrease))
 
-;; distraction-free modes
-;; olivetti: simple solution (just margins around the text)
-;; writeroom: involved solution (no modeline, no scroll bar…)
+;; (defun dn/load-theme-cond ()
+;;   "Carga un tema claro u oscuro dependiendo de si estamos ejecutando
+;; Emacs con la GUI o en una terminal."
+(if (display-graphic-p)
+    (load-theme 'leuven t)
+  (progn
+    (load-theme 'doom-city-lights t)
+    (solaire-global-mode +1)))
 
-(use-package olivetti
-  :init
-  (setq olivetti-body-width 86))
+;; (add-hook 'after-make-frame-functions #'dn/load-theme-cond)
 
-(use-package writeroom-mode
-  :config
-  (setq writeroom-width 86))
+;; configurar las fuentes
+;; configuramos una fuente para todo Emacs y luego configuramos los buffers
+;; de texto de manera particular
 
-;; theme: leuven
+;; enfoques:
+;;   https://www.reddit.com/r/emacs/comments/111bsc9/comment/j8eukes/
+;;   https://emacs.stackexchange.com/a/3044
+;;   https://zzamboni.org/post/beautifying-org-mode-in-emacs/
 
-(use-package leuven-theme
-  :config
-  (load-theme 'leuven t))
+(defvar dn/org-text-fonts '(("JetBrains Mono" . 12)  ;; multiplataforma
+			    ("Roboto Mono" . 12) ;; multiplataforma
+			    ("Menlo" . 18)  ;; exclusiva de macOS
+			    ("Consolas" . 16)  ;; exclusiva de Windows
+			    ("DejaVu Sans Mono" . 12))  ;; usualmente disponible en Linux
+  "Tipografías deseadas y su tamaño en puntos en orden de preferencia.")
 
-;; https://github.com/seagle0128/doom-modeline#use-package
+(defvar dn/org-block-fonts '(("Iosevka Fixed" . 13)  ;; multiplataforma
+  			     ("Fira Code" . 12))  ;; multiplataforma
+  "Tipografías monoespaciadas deseadas y su tamaño en puntos en orden de preferencia.")
 
-(use-package doom-modeline
-  :init
-  (doom-modeline-mode 1))
+(defun font-available-p (font-name)
+  ;; fuente:
+  ;;   https://emacsredux.com/blog/2021/12/22/check-if-a-font-is-available-with-emacs-lisp/
+  (find-font (font-spec :name font-name)))
 
-(use-package yasnippet
-  :init
-  (yas-global-mode 1)
-  :config
-  (add-to-list #'yas-snippet-dirs (locate-user-emacs-file "snippets")))
+(defun dn/check-available-fonts (font-alist)
+  "Verifica qué fuentes están disponibles en la plataforma anfitriona.
+  Devuelve aquellas existentes en orden de preferencia."
+  (let (available-fonts)
+    (dolist (font font-alist)
+      (when (font-available-p (car font))
+        (push font available-fonts)))
+    (nreverse available-fonts)))
 
-;; configure the almighty org-mode
+(setq dn/available-org-text-fonts (dn/check-available-fonts dn/org-text-fonts))
+(setq dn/available-org-block-fonts (dn/check-available-fonts dn/org-block-fonts))
 
-(defun deactivate-electric-indent-local-mode ()
-  "Since Org 9.4, RET and C-j obey electric-indent-mode. This indentation is
-fine for source code, but I find it inconvenient when writing org documents.
-This function deactivates the electric-indent minor mode locally. We must load
-it with the org hook."
-  (electric-indent-local-mode -1))
+(unless (eq dn/available-org-block-fonts nil)
 
-(use-package org
-  :defer t
-  :config
-  ;; go back to old (pre-Org 9.4) org-return behaviour (see Org 9.4 release notes)
-  (add-hook 'org-mode-hook 'deactivate-electric-indent-local-mode)
-  ;; default view when opening a file: all the headers, and only the headers
-  (setq org-startup-folded 'content)
-  ;; always leave an empty line between collapsed headers
-  (setq org-cycle-separator-lines 1)
-  ;; activate speed commands on headers
-  (setq org-use-speed-commands t)
-  ;; activate special behaviour for C-a/e and C-k on headers
-;; no funciona
-;;  (setq org-special-ctrl-a/e t
-;;        org-special-ctrl-k t)
-  ;; use a curved arrow instead of 3 dots to signal an invisible region
-  (setq org-ellipsis " ⤵")
-  ;; don't underline the org-ellipsis character(s)
-  (set-face-attribute 'org-ellipsis nil :underline nil)
-  ;; deal with edits on invisible regions in a smart way
-  (setq org-catch-invisible-edits 'smart)
-  ;; never hide the emphasis markers (for example, slashes for italics)
-  (setq org-hide-emphasis-markers nil)
-  ;; how to display LaTeX images (math)
-  ;; C-c C-x C-l (org-latex-preview) <-- show/hide equation next to point
-  ;; C-u C-c C-x C-l <-- show/hide equations in current section
-  ;; C-u C-u C-c C-x C-l <-- show/hide equations in the current document
-  (setq org-format-latex-options (plist-put org-format-latex-options :scale 1.8)
-        org-format-latex-options (plist-put org-format-latex-options :foreground "Black")
-        org-format-latex-options (plist-put org-format-latex-options :background "White")
-        org-format-latex-options (plist-put org-format-latex-options :html-foreground "Black")
-        org-format-latex-options (plist-put org-format-latex-options :html-background "Transparent")
-        org-format-latex-options (plist-put org-format-latex-options :html-scale 1.0))
-  ;; bypass org-babel confirmation for evaluating the listed languages
-  (defun my-org-confirm-babel-evaluate (lang body)
-    (not (member lang '("python" "R"))))
-  (setq org-confirm-babel-evaluate #'my-org-confirm-babel-evaluate)
-  ;; tell org-babel which languages it should be aware of
-  ;; nil para desactivar, t para activar
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   '((R . nil)
-     (python . t)
-     (emacs-lisp . t)))
-;;  :bind
-;;  (:map org-mode-map
-;;        ("C-a" . org-beginning-of-line)
-;;        ("C-e" . org-end-of-line)
-;;        ("C-k" . org-kill-line))
+  ;; (setq my-org-block-font-spec (format "%s-%d"
+  ;; (caar dn/available-org-block-fonts)
+  ;; (cdar dn/available-org-block-fonts)))
+
+  (set-face-attribute 'default nil
+		      :family (caar dn/available-org-block-fonts)
+		      :height (* 10 (cdar dn/available-org-block-fonts)))
   )
 
-;; https://emacs.stackexchange.com/a/20093/26521
-;; https://ddavis.io/posts/emacs-python-lsp/
-(use-package pyvenv
-  :config
-  (setenv "WORKON_HOME" (expand-file-name "~/miniconda3/envs/"))
-  (pyvenv-mode 1))
-;; M-x pyvenv-workon
-;; M-x pyvenv-deactivate
 
-;; Org-roam: a Roam Research clone that implements a Zettelkasten
+;; (setq my-org-text-font-spec (format "%s-%d"
+;; (caar dn/available-org-text-fonts)
+;; (cdar dn/available-org-text-fonts)))
 
-(use-package org-roam
-  :hook
-  (after-init . org-roam-mode)
-  :custom
-  (org-roam-directory
-   (expand-file-name
-    (file-name-as-directory "~/org/Zettelkasten")))
-  (org-roam-completion-system 'ivy)
-  (org-roam-buffer-position 'right)
-  (org-roam-buffer-width 0.33)
-  :bind
-  (:map org-roam-mode-map
-   ("C-c n b" . org-roam)
-   ("C-c n f" . org-roam-find-file-immediate)
-   :map org-mode-map
-   ("C-c n i" . org-roam-insert)
-   ("C-c n I" . org-roam-insert-immediate)))
+(defun dn/set-org-faces ()
+  "Configurar la tipografía para Org."
+  (with-eval-after-load 'org-faces
+    (unless (eq dn/available-org-text-fonts nil)
+      (face-remap-add-relative 'default
+			       :family (caar dn/available-org-text-fonts)
+			       :height (* 10 (cdar dn/available-org-text-fonts))))
+    (unless (eq dn/available-org-block-fonts nil)
+      (set-face-attribute 'org-block nil
+			  :family (caar dn/available-org-block-fonts)
+			  :height (* 10 (cdar dn/available-org-block-fonts))))
+    ))
 
-(use-package markdown-mode
-  :ensure t
-  :commands (markdown-mode gfm-mode)
-  :mode (("README\\.md\\'" . gfm-mode)
-         ("\\.md\\'" . markdown-mode)
-         ("\\.markdown\\'" . markdown-mode))
-  :init (setq markdown-command "multimarkdown"))
+(add-hook 'text-mode-hook #'dn/set-org-faces)
 
-;; https://www.youtube.com/watch?v=Uz_0i27wYbg
-;; https://ryan.himmelwright.net/post/emacs-update-evil-usepackage/
-;; https://teddit.net/r/emacs/comments/esi403/straightel_usepackage_evil_not_running_config/
-;; https://teddit.net/r/emacs/comments/726p7i/evil_mode_and_use_package/
-;; https://teddit.net/r/emacs/comments/9ctvmo/evilorgmode/
-;; https://github.com/Somelauw/evil-org-mode
-
-;; evil packages/plug-ins
-;; https://github.com/syl20bnr/spacemacs/blob/b6aed092cf1de8992522d69c8158a20df880a84e/layers/%2Bspacemacs/spacemacs-evil/packages.el#L12
-;; https://www.emacswiki.org/emacs/Evil#h5o-6
-;; https://github.com/hlissner/doom-emacs/tree/235c386368f0814671131d0d77e32be450c92cbc/modules/editor/evil#plugins
-
-(use-package evil-leader
-  :config
-  (global-evil-leader-mode 1)
-  (evil-leader/set-leader "º")
-  (evil-leader/set-key
-   "b" 'ivy-switch-buffer
-   "f" 'find-file
-   "r" 'recentf-open-files
-   "o" 'other-window))
-
-
-;; https://github.com/emacs-evil/evil-surround
-(use-package evil-surround
-  :config
-  (global-evil-surround-mode 1))
-
-
-;; https://github.com/emacs-evil/evil
-(use-package evil
-  :after (evil-leader)
-  :init
-  ;; https://evil.readthedocs.io/en/latest/settings.html
-  (setq evil-vsplit-window-right t
-        evil-split-window-below t
-        evil-undo-system 'undo-fu) ;; no funciona
-  :config
-  (evil-mode 1))
-
-
-;; http://vimcasts.org/episodes/swapping-two-regions-of-text-with-exchange-vim/
-(use-package evil-exchange
-  ;; init: spacemacs config:
-  ;; https://github.com/syl20bnr/spacemacs/blob/b6aed092cf1de8992522d69c8158a20df880a84e/layers/%2Bspacemacs/spacemacs-evil/packages.el#L134
-  :init
-  (progn
-    (let ((evil-exchange-key (kbd "gx"))
-          (evil-exchange-cancel-key (kbd "gX")))
-      (define-key evil-normal-state-map evil-exchange-key 'evil-exchange)
-      (define-key evil-visual-state-map evil-exchange-key 'evil-exchange)
-      (define-key evil-normal-state-map evil-exchange-cancel-key 'evil-exchange-cancel)
-      (define-key evil-visual-state-map evil-exchange-cancel-key 'evil-exchange-cancel))))
-
-
-;; https://github.com/Somelauw/evil-org-mode/
-(use-package evil-org
-  :after (evil org)
-  :hook (org-mode . evil-org-mode)
-  :config
-  ;; navigation: https://github.com/Somelauw/evil-org-mode/blob/a629fb705b0ac704580d5a5833a64716284074e7/evil-org.el#L680
-  (evil-org-set-key-theme '(textobjects additional todo)))
-
-(use-package evil-unimpaired
-  :straight
-  (evil-unimpaired :type git
-                   :host github :repo "zmaas/evil-unimpaired")
-  :config
-  (evil-unimpaired-mode))
-
-;; para separar los portapapeles: Emacs/Evil y el sistema manejan
-;; registros distintos
-;; así, cmd-c/x/v trabajan por separado de los yank y put de Emacs/Evil
-(use-package simpleclip
-  :config
-  (simpleclip-mode 1))
-
-;; para aumentar o disminuir un contador
-;; 2022-07-26
-(use-package evil-numbers
-  :config
-  (evil-define-key '(normal visual) 'global (kbd "C-c +") 'evil-numbers/inc-at-pt)
-  (evil-define-key '(normal visual) 'global (kbd "C-c -") 'evil-numbers/dec-at-pt))
-
-
-;; considerar instalar después
-;; https://github.com/cute-jumper/evil-embrace.el
-;; https://github.com/syl20bnr/evil-escape
-;; https://github.com/edkolev/evil-lion
-;; https://github.com/redguardtoo/evil-nerd-commenter
-;; https://github.com/hlissner/evil-snipe
+;; función para insertar timestamp actual
+(defun dn/current-timestamp ()
+  " Inserta la fecha y hora actual en formato ISO 8601 con T como
+separador y sin especificar microsegundos. "
+  (interactive)
+  (insert (format-time-string "%Y-%m-%dT%H:%M:%S%:z")))

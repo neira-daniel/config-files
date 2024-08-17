@@ -1,437 +1,1421 @@
 # -*- coding: utf-8-unix; -*-
 
-#+STARTUP: content
+#+STARTUP: show2levels
 #+STARTUP: indent
-#+STARTUP: showstars
 
-#+PROPERTY: header-args  :tangle yes
-#+PROPERTY: header-args+ :tangle init.el
+#+PROPERTY: header-args  :tangle ../tangled/init.el
 #+PROPERTY: header-args+ :eval no
 
-#+TITLE: Configuración de Emacs: init.el
+#+CREATED: 2024-03-13T18:19:12-03:00
+#+LAST_MODIFIED: 2024-08-17T16:05:32-04:00
+
+#+LANGUAGE: es
 #+AUTHOR: Daniel Neira
-#+LANGUAGE: es_CL/en_US
-#+CREATED:
-#+MODIFIED: 2022-07-26T20:42:01-04:00
 
-* Preámbulo
+#+TITLE: Literate configuration: configuración de Emacs
 
-** Exportar (/tangle/) el archivo de configuración aquí contenido
+* Cuestiones preliminares
 
-=C-c C-v t=
+En esta sección cubrimos algunos elementos conceptuales mínimos para poder sacarle partido a esta guía.
 
-** Respaldar configuración actual de Emacs
+** TODO Convenciones y conceptos mínimos
 
-=cp ~/.emacs.d/init.el ~/.emacs.d/init.YYYY-MM-DD.el=
+Interactuaremos con Emacs presionando combinaciones de teclas que involucran =Control=, =Meta= y, en algunas ocasiones, =Super=. =Meta= será, usualmente, la tecla =Alt= y =Super= será la tecla Windows en los teclados que la posean y =⌘= ("=cmd=") en el caso de los computadores Apple. Notemos que Windows interferirá con el uso fluido de la tecla =Super=, pero no habrá problema para utilizarla en otros sistemas operativos.
 
-** Activar nueva configuración
+Podemos leer más acerca de las teclas especiales de Emacs [[http://xahlee.info/emacs/emacs/emacs_hyper_super_keys.html][aquí]].
 
-=cp ~/org/literate_configs/init.el ~/.emacs.d/init.el= y reiniciar Emacs.
+Denotaremos =Control= con =C-=, =Meta= con =M-= y =Super= con =s-= (minúscula).
 
-* Inicialización
+Ejemplos:
 
-** =straight.el= · Instalación y configuración del administrador de paquetes
+- Abrir un archivo: =C-x C-f=. Esto significa que debemos presionar la tecla =Control= y =x= a la vez y luego =Control= y =f= también a la vez.
+- Cerrar un archivo: =C-x C-k=. Presionaremos =Control= y =x= y luego =Control= y =k=.
 
-Utilizando [[https://github.com/raxod502/straight.el][=straight.el=]] podremos instalar, administrar y actualizar una infinidad de paquetes de terceros casi sin esfuerzo. Solo tendremos que intervenir en casos en que queramos instalar una versión específica de un paquete (por ejemplo, fijar una versión estable o instalar una inestable) o uno que no esté en los repositorios que =straight.el= utiliza ([[http://melpa.org/][MELPA]], [[https://elpa.gnu.org/][GNU ELPA]] e [[https://emacsmirror.net/][Emacsmirror]], [[https://github.com/raxod502/straight.el#recipe-lookup][en ese orden de precedencia]]).
+A lo largo de la guía también nos referiremos a las siguientes /distribuciones/ de Emacs:
+
+- [[https://github.com/doomemacs/doomemacs][Doom Emacs]].
+- [[https://github.com/syl20bnr/spacemacs][Spacemacs]].
+- [[https://github.com/bbatsov/prelude][Prelude]].
+
+Estos corresponden a paquetes de Emacs con configuraciones predeterminadas. Las dos primeras son populares al interior de la comunidad mientras que la tercera no lo es. Aprovechamos que su código está en GitHub para extraer algunas funciones y trucos que mejorarán nuestra experiencia de usuario en Emacs.
+
+Otro vocabulario de utilidad:
+
+- /buffer/: desde el punto de vista de un usuario casual, cada uno de los archivos abiertos.
+- /frame/: en la GUI (interfaz gráfica de usuario), lo que usualmente llamamos "ventana".
+- /window/: no corresponde a la ventana de la GUI, sino a cada una de las regiones donde Emacs está desplegando un /buffer/. Podemos desplegar varias /windows/ dentro de un /frame/.
+
+** Comandos de utilidad válidos en una instalación limpia de Emacs.
+
+Podemos interrumpir una secuencia de comandos presionando =C-g=.
+
+*** Manejo de /buffers/
+
+Es posible redefinir muchas cosas en Emacs. En particular, sus atajos de teclado. Los siguientes son algunos atajos de teclado que funcionarán en una instalación limpia de Emacs y en cualquiera en donde ellos no hayan sido redefinidos por el usuario. Entre paréntesis se incluyen las funciones que se ejecutan con cada comando.
+
+| Acción                   | Atajo     | Función                     |
+|--------------------------+-----------+-----------------------------|
+| Abrir archivo            | =C-x C-f= | =find-file=                 |
+| Guardar /buffer/         | =C-x C-s= | =save-buffer=               |
+| Cerrar /buffer/          | =C-x k=   | =kill-buffer=               |
+| Cambiar /buffer/         | =C-x b=   | =switch-to-buffer=          |
+| Abrir ventana vertical   | =C-x 3=   | =split-window-right=        |
+| Abrir ventana horizontal | =C-x 2=   | =split-window-below=        |
+| Cambiar de ventana       | =C-x o=   | =other-window=              |
+| Maximizar ventana        | =C-x 1=   | =delete-other-windows=      |
+| Cerrar Emacs             | =C-x C-c= | =save-buffer-kill-terminal= |
+
+Dado que estos atajos (y muchos de Emacs en general) no son muy ergonómicos, será usual definir unos nuevos que se ajusten mejor a cada usuario.
+
+La tecla =CTRL= es clave en el uso Emacs. Tanto así que algunas personas llegan incluso a configurar su teclado para situarla en un lugar al que sea más fácil llegar con sus dedos. Ejemplo de esto es reemplazar a nivel lógico (mediante un programa) el funcionamiento de la tecla =Caps Lock= para que opere como si fuera =CTRL=.
+
+*** Ejecución de expresiones de Emacs Lisp
+
+Lisp es el nombre de una familia de lenguajes de programación con una historia que data de fines de la década de 1950. Podemos describir a Emacs como un intérprete de Emacs Lisp, el dialecto de Lisp utilizado por el programa.
+
+Tanto Emacs Lisp como Emacs están implementados fundamentalmente en el lenguaje C. Sin embargo, no será necesario programar en C para configurarlo ni extender su funcionamiento de cara al usuario: para ello utilizaremos el propio lenguaje Emacs Lisp.
+
+En lo que sigue, llamaremos a Emacs Lisp simplemente Lisp.
+
+Ocasionalmente desearemos evaluar expresiones de Emacs Lisp de manera directa.
+
+Utilizaremos =M-x= cuando queramos llamar una función de manera interactiva. Por ejemplo, =M-x flyspell-buffer= invocará a la función =flyspell-buffer=. En caso de que la función requiera argumentos, Emacs nos pedirá introducirlos para poder completar el llamado.
+
+Si quisiéramos evaluar una expresión completa de una vez (con sus argumentos ya explicitados en caso de que ellos sean necesarios), tenemos tres alternativas (incluimos entre paréntesis las funciones de Lisp asociadas con cada combinación de teclas):
+
+- =C-j= (=eval-print-last-sexp=): presionaremos esta combinación solo después de haber situado el cursor en el último paréntesis de cierre de la expresión que deseamos evaluar. El resultado será impreso en el mismo /buffer/ donde se encuentra la expresión evaluada.
+- =C-x C-e= (=eval-last-sexp=): igual que el caso anterior, pero el resultado se imprimirá en el "área de mensajes" (/echo area/), que es algo así como la barra de estado del programa.
+- =M-:= (=eval-expression=): luego de presionar esta combinación el cursor se posicionará en la /echo area/ junto al mensaje =Eval:=, esperando a que escribamos la expresión que deseamos evaluar. A diferencia de cuando presionamos =M-x=, en este caso no debemos olvidar escribir los paréntesis (esto, debido a que le estamos pidiendo a Emacs que evalúe una expresión válida de Lisp).
+
+*** Obtención de ayuda contextual
+
+Si tenemos dudas sobre alguna variable o función de Lisp o de algún atajo de teclado de Emacs, podemos presionar =C-h= (donde =h= denota /help/) para indicarle al programa que deseamos ayuda y luego una letra clave de acuerdo a lo explicitado en la tabla siguiente:
+
+| Acción               | Atajo   | Función asociada    |
+|----------------------+---------+---------------------|
+| Ayuda sobre atajo    | =C-h k= | =describe-key=      |
+| Ayuda sobre variable | =C-h v= | =describe-variable= |
+| Ayuda sobre función  | =C-h f= | =describe-function= |
+
+Completaremos la consulta escribiendo el nombre de la variable o función que nos interesa o bien presionando la combinación de teclas sobre la que deseamos obtener más información.
+
+En caso de que iniciemos la consulta con el cursor posicionado sobre la variable o función que nos interesa, Emacs nos sugerirá completar la consulta con ese texto. Notemos que si el cursor está sobre una variable y consultamos por una función, Emacs no nos propondrá completar la consulta con ese texto. Lo mismo si el cursor está sobre una función y le indicamos que deseamos información sobre una variable.
+
+*** Otros comandos
+
+**** Obtener el nombre de la tipografía utilizada en el texto que se encuentra bajo el cursor
+
+La GUI de Emacs nos permite desplegar múltiples tipografías y con distintas propiedades (como tamaño) en un mismo /buffer/, cosa imposible de lograr al ejecutar Emacs en una terminal.
+
+Podemos aprovechar esta ventaja de la GUI para, por ejemplo, utilizar una tipografía para la prosa de un documento de Org y otra distinta para el texto que está al interior de los bloques de código contenidos en dicho documento.
+
+Es tanta la libertad que nos da Emacs en este aspecto que podríamos olvidar ocasionalmente cuáles son las tipografías que estamos utilizando.
+
+Si quisiéramos saber cuál es la fuente del texto que está bajo el cursor tenemos dos alternativas:
+
+- ~C-u C-x =~: se abrirá un /buffer/ auxiliar con información contextual en donde aparecerá el dato que buscamos.
+- ~M-x describe-char~: equivalente al atajo anterior, pero más memorable.
+
+** Orden en el que son ejecutados los archivos de configuración
+
+El [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Find-Init.html][orden]] es el siguiente:
+
+1. =~/.emacs.el=.
+2. =~/.emacs=.
+3. =~/.emacs.d/init.el=.
+4. =~/.config/emacs=.
+
+En esta lista, ~init.el~ es el archivo de configuración usual de Emacs. Casi la totalidad de esta guía contiene código que será exportado a ese archivo. Pero existen otros archivos adicionales que Emacs leerá para determinar su estado de ejecución inicial.
+
+Archivos de configuración especiales:
+
+- [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Early-Init-File.html][Early init]]: se ejecuta muy al inicio, previo a la inicialización del sistema de paquetes y de la interfaz gráfica. Todo ello ocurre antes de que Emacs comience a leer ~init.el~. Lo utilizaremos en esta guía para asegurarnos de que Emacs utilice nuestro administrador de paquetes favorito en lugar de aquel que viene incluido con el programa.
+- [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html][Custom]]: contendrá, si así se lo indicamos a Emacs, las instrucciones generadas por el asistente de configuración de este programa.
+
+Existen muchos aspectos de Emacs que podemos configurar con su asistente. Preferimos en este caso no utilizarlo o bien portar a ~init.el~ el código que este genera porque trae beneficios de orden y portabilidad. Utilizamos así ~init.el~ como el archivo maestro de configuración.
+
+
+* Cómo utilizar esta guía y su contenido
+
+** Cómo exportar (/tangle/) el código almacenado en este documento Org
+
+Exportaremos los archivos =init.el= y =early-init.el= aquí contenidos presionando la siguiente combinación: =C-c C-v t=.
+
+** Cómo activar los archivos de configuración
+
+Verificaremos manualmente que no existe ninguno de los siguientes archivos:
+
+- =~/.emacs.el=.
+- =~/.emacs=.
+- =~/.emacs.d/init.el=.
+- =~/.emacs.d/early-init.el=.
+
+Respaldaremos aquellos archivos existentes como una medida de seguridad en caso que debamos consultarlos a futuro o restituirlos.
+
+Almacenaremos luego los archivos =init.el= y =early-init.el= exportados con /tangle/ en el directorio =~/.emacs.d/=.
+
+Reiniciaremos Emacs para que los cambios surtan efecto.
+
+** Inicialización y actualización de variables
+
+*** TODO Personales
+
+- [ ] Quizás existan más variables interesantes que inicializar/sobreescribir
+
+#+name: datos-usuario
+#+begin_src emacs-lisp
+  ;; Inicialización o actualización de variables
+  ;;   - nombre de usuario
+  (setq user-full-name "Daniel Neira")
+  ;;   - directorio de inicio (el que aparecerá al presionar C-x C-f por primera vez)
+  ;;     - debe estar ubicado en el directorio personal del usuario
+  ;;       - C:\Users\{username} en Windows
+  ;;       - ${HOME} en los demás sistemas operativos
+  ;;     - si no existe, será creado
+  (setq dn/starting-folder "org-vault")
+#+end_src
+
+*** TODO Identificación del sistema operativo anfitrión
+
+- [ ] Hacer control de versiones para no perder las alternativas de ON-WSL que tengo aquí.
+
+Obtenemos el tipo de sistema operativo y la versión /mayor/ de Emacs utilizando el siguiente código descontinuado adaptado de [[https://github.com/doomemacs/doomemacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L20][Doom Emacs]] y [[https://emacs.stackexchange.com/a/48584][expandido]] para incluir la posibilidad de estar trabajando en el Windows Subsystem for Linux (WSL):
+
+#+name: obtener-OS
+#+begin_src emacs-lisp
+  ;; función auxiliar
+  (defun dn/string-match-p (REGEXP STRING)
+    " Wrapper para string-match-p que devuelve t cuando
+  hay coincidencia y nil cuando no."
+    (if (string-match-p REGEXP STRING)
+        t
+      nil))
+
+  ;; obtención del sistema operativo que aloja Emacs
+  ;; (defconst IS-WSL     (and (eq system-type 'gnu/linux)
+  ;; (dn/string-match-p "Microsoft"
+  ;; (shell-command-to-string "uname -a"))))
+  ;; (defconst IS-LINUX   (and (not IS-WSL)
+  ;; (eq system-type 'gnu/linux)))
+  (defconst ON-MAC     (eq system-type 'darwin))
+  (defconst ON-LINUX   (eq system-type 'gnu/linux))
+  ;; asumimos que trabajamos con, al menos, Windows Vista
+  (defconst ON-WINDOWS (eq system-type 'windows-nt))
+  (defconst ON-WSL     (and (string-match-p "Microsoft" operating-system-release)
+  			  ON-LINUX))
+
+  ;; obtención de la versión de Emacs
+  (defconst EMACS27+   (> emacs-major-version 26))
+  (defconst EMACS28+   (> emacs-major-version 27))
+  (defconst EMACS29+   (> emacs-major-version 28))
+#+end_src
+
+Esto nos servirá para introducir configuraciones que dependan del sistema operativo en que estemos ejecutando Emacs de manera programática.
+
+* Configuración del administrador de paquetes
+
+Utilizaremos =straight.el= y =use-package= en conjunto para instalar, activar y configurar paquetes.
+
+Existe una variedad saludable de soluciones para instalar paquetes en Emacs. Podemos leer acerca de las ventajas y desventajas de cada uno de ellos en el [[https://github.com/radian-software/straight.el/tree/b3760f5829dba37e855add7323304561eb57a3d4?tab=readme-ov-file#comparison-to-other-package-managers][manual]] de =straight.el=. A pesar de que esa explicación está sesgada, no deja de ser informativa.
+
+El único requerimiento de =straight.el= para funcionar es tener =git= instalado.
+
+** =straight.el=
 
 *** Instalación
 
-Siguiendo las indicaciones de la [[https://github.com/raxod502/straight.el/tree/5d046ad09413f3aba6198229e392cdd3f07e77ee#bootstrapping-straightel][documentación]] de ~straight.el~, instalamos el paquete de la siguiente forma:
+Utilizamos el [[https://github.com/radian-software/straight.el/tree/b3760f5829dba37e855add7323304561eb57a3d4?tab=readme-ov-file#getting-started][código]] disponible en el manual:
 
-#+BEGIN_SRC emacs-lisp
-  ;;; init.el -*- lexical-binding: t; -*-
+#+name: straight.el-bootstrap
+#+begin_src emacs-lisp
+  ;;; init.el -*- coding: utf-8-unix; -*- lexical-binding: t; -*-
 
-  ;; straight.el bootstrapping
-
+  ;; bootstraping straight.el de acuerdo al manual
+  ;; ver GH·radian-software/straight.el
   (defvar bootstrap-version)
   (let ((bootstrap-file
-         (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-        (bootstrap-version 5))
+         (expand-file-name
+          "straight/repos/straight.el/bootstrap.el"
+          (or (bound-and-true-p straight-base-dir)
+              user-emacs-directory)))
+        (bootstrap-version 7))
     (unless (file-exists-p bootstrap-file)
       (with-current-buffer
           (url-retrieve-synchronously
-           "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+           "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
            'silent 'inhibit-cookies)
         (goto-char (point-max))
         (eval-print-last-sexp)))
     (load bootstrap-file nil 'nomessage))
-#+END_SRC
+#+end_src
 
-Notemos que cada vez que se ejecute este código se abrirá en segundo plano un /buffer/ llamado ~*straight-process*~. Podemos ocultarlo siguiendo el consejo que aparece [[https://github.com/raxod502/straight.el/issues/367][aquí]], aunque creo que no es necesario hacerlo.
+*** Configuración
 
-*** Integración con =use-package=
+Será una buena práctica utilizar solo un administrador de paquetes. Debemos, entonces, eliminar todo el código que se ejecute a través de =package.el=, el administrador de paquetes nativo de Emacs. De acuerdo al [[https://github.com/radian-software/straight.el/tree/b3760f5829dba37e855add7323304561eb57a3d4?tab=readme-ov-file#getting-started][manual]] de =straigth.el=, esto incluye las siguientes funciones:
 
-=use-package= nos facilita la configuración de los paquetes de Emacs gracias al uso de una sintaxis compacta y, en mi opinión, elegante. A través de él también podemos instalar paquetes, por lo que lo configuraremos para que lo haga utilizando =straight.el=:
+- =package-initialize=
+- =package-archives=
 
-#+BEGIN_SRC emacs-lisp
-  ;; straight.el and use-package integration
+Tampoco podremos utilizar las siguientes instrucciones de configuración de =use-package=:
 
+- =:ensure=
+- =use-package-always-ensure=
+
+Finalmente, incluiremos la siguiente expresión en el archivo "[[https://www.gnu.org/software/emacs/manual/html_node/emacs/Early-Init-File.html][early init]]" de Emacs:
+
+#+name: straight.el-early-init
+#+begin_src emacs-lisp :tangle ../tangled/early-init.el
+  (setq package-enable-at-startup nil)
+#+end_src
+
+Con esto lograremos que =package.el= no se ejecute antes de que =straight.el= pueda tomar el control.
+
+*** Uso
+
+**** Inspección de recetas (/recipes/)
+
+Será algunas veces útil corroborar que el código que instalará =straight.el= proviene de la fuente que deseamos y no de una alternativa. Para obtener la /receta/ de instalación que utilizará =straight.el= [[https://systemcrafters.net/advanced-package-management/using-straight-el/][ejecutaremos]] =M-x straight-get-recipe=. La respuesta aparecerá en la "barra de estados" (/echo area/).
+
+Si ya hubiésemos instalado el paquete y deseamos verificar la procedencia del código podemos ejecutar src_git[:tangle no]{git remote -v} en el directorio donde está el código fuente.
+
+**** Actualización de paquetes instalados
+
+Contamos con 3 funciones que nos permitirán actualizar paquetes:
+
+- =M-x straight-pull-package=: nos permitirá actualizar un paquete en particular. Cuando lo ejecutemos, =straight.el= nos mostrará una lista con las alternativas que tenemos.
+- =M-x straight-pull-package-and-deps=: como la función anterior, pero ahora también actualizaremos las dependencias del paquete que escojamos.
+- =M-x straight-pull-all=: utilizaremos esta función cuando queramos actualizar todos lo paquetes de una vez.
+
+**** Uso de /lockfiles/ para garantizar la reproducibilidad de los estados de los paquetes
+
+Con =straight.el= podemos especificar los paquetes que deseamos instalar y sus "versiones". Al momento de redacción de esta guía, solo podemos especificar estas /versiones/ en función de los /commits/ del código fuente de cada paquete.
+
+Son dos las operaciones relevantes para reproducir los estados de los paquetes:
+
+- =M-x straight-freeze-versions=: nos permite exportar la lista de paquetes instalados y los /hash/ de los /commit/ en uso de cada uno de ellos. Nos referiremos al archivo generado por este procedimiento como /lockfile/.
+- =M-x straight-thaw-versions=: se encarga de activar los /commits/ especificados en el /lockfile/ antes generado para los paquetes instalados. Asume que dichos paquetes fueron instalados con =straight.el= y que la configuración de cada uno de ellos se encuentra en ~init.el~-
+
+Notemos que los archivos creados al ejecutar =(straight-freeze-versions)= serán guardados en =~/.emacs.d/straight/versions/=. En el caso más simple (un solo usuario de la instalación de Emacs), este directorio contendrá solo un archivo con el nombre =default.el=.
+
+Podemos leer más acerca de la reproducibilidad de instalaciones con =straight.el= leyendo [[https://github.com/radian-software/straight.el/tree/88e574ae75344e39b436f863ef0344135c7b6517?tab=readme-ov-file#lockfile-management][su documentación]].
+
+**** Otras opciones
+
+Podemos consultar el artículo "[[https://systemcrafters.net/advanced-package-management/using-straight-el/][Advanced Emacs Package Management with straight.el]]" de System Crafters para conocer más acerca de las posibilidades prácticas de =straight.el=.
+
+** =use-package=
+
+*** Instalación
+
+Como es de esperar, [[https://github.com/radian-software/straight.el/tree/b3760f5829dba37e855add7323304561eb57a3d4?tab=readme-ov-file#integration-with-use-package][instalamos]] =use-package= con =straight.el=.
+
+#+name: use-package-install
+#+begin_src emacs-lisp
+  ;; instalación de use-package
   (straight-use-package 'use-package)
-  (setq straight-use-package-by-default t) 
-#+END_SRC
+#+end_src
 
-Ahora, cada vez que =use-package= note que queremos configurar un paquete que no está disponible en el computador, lo instalará a través de =straight.el=.
+*** Configuración
 
-La documentación de ~use-package~ está divida en dos. Una de ellas es bastante completa y se encuentra en [[https://github.com/jwiegley/use-package/][GitHub]]. La otra casi está vacía salvo por una extensa explicación sobre las palabras clave (/keywords/) que podemos utilizar para configurar los paquetes. Dicha guía la podemos encontrar [[https://jwiegley.github.io/use-package/keywords/][aquí]].
+Configuramos =use-package= para que siempre instale paquetes a través de =straight.el= asignando =t= a la variable =straight-use-package-by-default=.
 
-*** Consideraciones
+Aprovechamos =use-package= para [[https://jeffkreeftmeijer.com/emacs-straight-use-package/][configurar]] esta variable:
 
-Aunque esto no es efectivo, podemos suponer para efectos prácticos que =straight.el= es incompatible con =packages.el=, el administrador de paquetes original de Emacs. Como el primero reemplaza completamente al segundo, no tiene sentido utilizarlos a la vez, por lo que debemos eliminar todas las instrucciones que hagan uso de =packages.el=, tales como:
+#+name: use-package-straight.el-configuration
+#+begin_src emacs-lisp
+  ;; configuramos use-package para que siempre instale paquetes con straight.el
+  (use-package straight
+    :custom
+    (straight-use-package-by-default t))
+#+end_src
 
-- Referencias a =package-initialize= y =package-archives=.
-- La instrucción =:ensure= asociada a =use-package=.
-- La activación de la variable =use-package-always-ensure=.
+Con esto nos ahorramos tener que declarar =:straight t= en la configuración de cada paquete. En caso de que deseemos revertir este comportamiento, tendremos que especificar =:straight nil= en la configuración de cada paquete que no deseemos instalar con este administrador.
 
-En “[[https://github.crookster.org/switching-to-straight.el-from-emacs-26-builtin-package.el/#step-2-convertremove-packageel-stuff][Switching to straight.el from Emacs 26 builtin package.el]]” podremos encontrar otros ejemplos de las instrucciones que debemos borrar.
+* Configuración de paquetes
 
-~straight.el~ no actualiza los paquetes de forma automática ni se ocupa de llevar un registro de qué versiones tenemos instaladas. Ambas tareas debemos llevarlas a cabo de forma manual.
+En esta sección configuramos Emacs aprovechando paquetes desarrollados por terceras partes.
 
-En la práctica, si solo deseamos descargar y activar el código asociado al último /commit/ disponible de un paquete, ejecutamos ~M-x straight-pull-package~ (o ~straight-pull-package-and-deps~ si queremos también incluir sus dependencias) y seleccionamos el paquete que nos interesa actualizar.
+** Emacs como editor modal: emulación de Vim y paquetes relacionados
 
-Para tener una idea más acabada de las opciones que tenemos para controlar qué versiones de los paquetes debe ~straight.el~ instalar, podemos consultar las siguientes fuentes:
+*** Evil: emulador de vim
 
-- Documentación oficial: [[https://github.com/raxod502/straight.el/tree/5d046ad09413f3aba6198229e392cdd3f07e77ee#version-control-operations][Version control operations]].
-- Documentación oficial: [[https://github.com/raxod502/straight.el/tree/5d046ad09413f3aba6198229e392cdd3f07e77ee#lockfile-management][Lockfile management]].
-- Reddit: [[https://old.reddit.com/r/emacs/comments/caifq4/package_updates_with_straight/][package updates with straight]].
+Podemos afirmar que [[https://github.com/emacs-evil/evil][Evil]] convierte a Emacs en un editar modal fantástico. Lo configuramos de la siguiente manera:
 
-En general, a menos que hayamos modificado localmente los paquetes que instalamos, nos bastará con las siguientes dos funciones para guardar y cargar /snapshots/ de Emacs:
+#+name: evil-config
+#+begin_src emacs-lisp
+  ;; configuración de Evil
+  (use-package evil
+    :init
+    ;; https://evil.readthedocs.io/en/latest/settings.html
+    (setq evil-vsplit-window-right t
+  	evil-split-window-below t
+  	evil-undo-system 'undo-fu)
+    ;; desactivamos C-i para que TAB funcione en la terminal
+    (setq evil-want-C-i-jump nil)
+    :config
+    ;; definición de la tecla <leader>
+    (evil-set-leader 'normal (kbd "SPC"))
+    ;; guardar el archivo con w
+    (evil-define-key 'normal 'global (kbd "<leader>w") 'save-buffer)
+    ;; utilizar U para deshacer un cambio (notemos que U cumple otra función en Vim y aquí la estamos sobreeescribiendo)
+    (evil-define-key 'normal 'global (kbd "U") 'evil-redo)
+    ;; borrar desde el cursor hasta el comienzo de la línea sin modificar los registros
+    (evil-define-key 'normal 'global (kbd "C-<backspace>") (kbd "\"_d0"))
+    (evil-define-key 'insert 'global (kbd "C-<backspace>") (kbd "C-o \" _ d 0"))
+    ;; ir al siguiente buffer
+    (evil-define-key 'normal 'global (kbd "<leader>o") (kbd "C-x o"))
+    ;; activar evil-mode
+    (evil-mode 1))
+#+end_src
 
-- ~M-x straight-freeze-versions~: examina los paquetes instalados por ~init.el~ y guarda información sobre las versiones de todo ellos en ~/.emacs.d/straight/versions/default.el~.
-- ~M-x straight-thaw-versions~: instala las versiones de los paquetes detalladas en el archivo ~default.el~ creado por ~straight-freeze-versions~.
+Nos basamos en [[https://github.com/noctuid/evil-guide/tree/c129552001928623993d5337f6ce6469fc465e4e?tab=readme-ov-file#leader-key][Evil guide]] del usuario noctuid de GitHub para configurar la tecla =<leader>= y los atajos.
 
-Cada vez que ejecutemos ~straight-freeze-versions~, ~default.el~ será sobreescrito. Es por ello que es recomendable llevar un control de versiones de él. De esta forma siempre podremos volver a un estado específico del tiempo.
+Además, hacemos uso del truco del "registro [[https://stackoverflow.com/a/3638557][hoyo negro]]" para poder configurar =C-<backspace>=.
 
-Para actualizar un paquete utilizaremos ~M-x straight-pull-package~.
+Notemos que también podríamos haber creado ese atajo con el [[https://github.com/bbatsov/prelude/blob/dd9b01a991c9599842ba88e52fe6ae8627f4a782/core/prelude-global-keybindings.el#L82][siguiente código]] extraido de Prelude:
 
-** Asignación de variables preliminares
+#+name: kill-lines-backwards
+#+begin_src emacs-lisp :tangle no
+  ;; Kill line backwards and adjust the indentation
+  (global-set-key (kbd "C-<backspace>") (lambda ()
+                                          (interactive)
+                                          (kill-line 0)
+                                          (indent-according-to-mode)))
+#+end_src
 
-*** Identificación de la versión de Emacs y del sistema operativo donde lo estamos ejecutando
+El problema con este código es que modifica los registros, almacenando en él lo que sea que hayamos borrado. Podríamos corregirlo [[https://stackoverflow.com/a/1694997][reescribiendo los registros]] con src_emacs-lisp[:tangle no]{(setq kill-ring (cdr kill-ring))}, cosa poco elegante, pero efectiva.
 
-Extraído directamente del [[https://github.com/hlissner/doom-emacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L20][archivo de configuración ~core.el~ de Doom Emacs]]:
+*** evil-org: atajos de teclado para Org contextuales a cada modo
 
-#+BEGIN_SRC emacs-lisp
-  ;; Emacs major version and host operating system identification
+Utilizaremos [[https://github.com/Somelauw/evil-org-mode/][evil-org]] para activar atajos de teclado en modos distintos al de insertar. Sin él, solo podremos, por ejemplo, colapsar y expandir el contenido de las secciones con =TAB= en el modo insertar.
 
-  (defconst EMACS27+   (> emacs-major-version 26))
-  (defconst EMACS28+   (> emacs-major-version 27))
-  (defconst IS-MAC     (eq system-type 'darwin))
-  (defconst IS-LINUX   (eq system-type 'gnu/linux))
-  (defconst IS-WINDOWS (memq system-type '(cygwin windows-nt ms-dos)))
-  (defconst IS-BSD     (or IS-MAC (eq system-type 'berkeley-unix)))
-#+END_SRC
+#+name: evil-org-config
+#+begin_src emacs-lisp
+  ;; configuración de evil-org
+  (use-package evil-org
+    :after (evil org)
+    :hook (org-mode . evil-org-mode)
+    :config
+    (evil-org-set-key-theme '(textobjects additional return todo)))
+#+end_src
 
-*** Asignación de la variable ~$HOME~ en sistemas Windows donde no esté inicializada
+Utilizamos =evil-org-set-key-theme= en el código anterior para activar los siguientes [[https://github.com/Somelauw/evil-org-mode/blob/95c6acc29ad11f4d44c3e93d6047dff256412498/evil-org.el#L60][atajos especiales]]:
 
-Extraído directamente del [[https://github.com/hlissner/doom-emacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L27][archivo de configuración ~core.el~ de Doom Emacs]]:
+- =textobjects=: [[https://github.com/Somelauw/evil-org-mode/blob/95c6acc29ad11f4d44c3e93d6047dff256412498/doc/keythemes.org#text-objects][documentación.]]
+- =additional=: [[https://github.com/Somelauw/evil-org-mode/blob/95c6acc29ad11f4d44c3e93d6047dff256412498/doc/keythemes.org#additional][documentación]].
+- =return=: [[https://github.com/Somelauw/evil-org-mode/blob/95c6acc29ad11f4d44c3e93d6047dff256412498/doc/keythemes.org#return][documentación]].
+- =todo=: [[https://github.com/Somelauw/evil-org-mode/blob/95c6acc29ad11f4d44c3e93d6047dff256412498/doc/keythemes.org#todo][documentación]].
 
-#+BEGIN_SRC emacs-lisp
-  ;; Unix tools look for HOME, but this is normally not defined on Windows
+Durante la configuración de Evil ejecutamos src_emacs-lisp[:tangle no]{(setq evil-want-C-i-jump nil)}. Lo hicimos para eliminar el conflicto descrito en [[http://web.archive.org/web/20240314095605/https://jeffkreeftmeijer.com/emacs-evil-org-tab/]["'Fix' the tab key for visibility cycling in Org and Evil mode"]]. Notemos que este cambio rompe la compatibilidad de ese atajo con lo que esperaría un usuario de Vim.
 
-  (when (and IS-WINDOWS (null (getenv "HOME")))
-    (setenv "HOME" (getenv "USERPROFILE")))
-#+END_SRC
+*** evil-surround: rodear un texto con pares de caracteres
 
-*** Fijar el directorio de inicio por omisión
+Será habitual que queramos encerrar una cadena de texto entre paréntesis (redondos, cuadrados, de llave) o entre comillas, entre otras posibilidades. Nos apoyaremos en [[https://github.com/emacs-evil/evil-surround][evil-surround]] para hacerlo con movimientos de Vim y atajos de teclado.
 
-Para asegurarnos de que el “explorador de archivos” de Emacs se abra inicialmente en nuestro directorio /home/, utilizamos las [[https://stackoverflow.com/a/21066034][siguientes instrucciones]]:
+#+name: evil-surround-config
+#+begin_src emacs-lisp
+  ;; configuración de evil-surround
+  (use-package evil-surround
+    :config
+    (global-evil-surround-mode 1))
+#+end_src
 
-#+BEGIN_SRC emacs-lisp
-  ;; set startup default directory as $HOME
+Podemos ver ejemplos de uso en la [[https://github.com/emacs-evil/evil-surround/tree/da05c60b0621cf33161bb4335153f75ff5c29d91?tab=readme-ov-file#examples][documentación]] del paquete.
 
-  (setq inhibit-startup-message t)
-  (setq default-directory (file-name-as-directory (getenv "HOME")))
-#+END_SRC
+*** evil-exchange: intercambiar cadenas de texto de posición
 
-Para asegurarnos de que la dirección termine con un /slash/ (y que sea el indicado independiente del sistema operativo), utilizamos =file-name-as-directory=. Y para que la instrucción completa funcione, por alguna razón antes [[https://stackoverflow.com/a/47284304/8909331][debemos impedir que cargue]] la pantalla de inicio de Emacs.
+Si solemos intercambiar el orden de las palabras en una oración, [[https://github.com/Dewdrops/evil-exchange][evil-exchange]] nos será de utilidad.
 
-Notemos que este valor de ~default-directory~ no será utilizado cuando invoquemos el explorador teniendo ya un archivo abierto. En este caso el explorador se abrirá en la carpeta donde se encuentra el archivo activo.
+Aprovechamos el siguiente [[https://github.com/syl20bnr/spacemacs/blob/2254b9c16150165f459895bb49bc309b029b54e4/layers/%2Bspacemacs/spacemacs-evil/packages.el#L146][código relevante]] de Spacemacs para lograr que evil-exchange funcione correctamente.
 
-*** Fijar y cargar el archivo de configuraciones del usuario
+#+name: evil-exchange-config
+#+begin_src emacs-lisp
+  ;; configuración de evil-exchange
+  (use-package evil-exchange
+    :init
+    (let ((evil-exchange-key (kbd "gx"))
+        (evil-exchange-cancel-key (kbd "gX")))
+      (define-key evil-normal-state-map evil-exchange-key 'evil-exchange)
+      (define-key evil-visual-state-map evil-exchange-key 'evil-exchange)
+      (define-key evil-normal-state-map evil-exchange-cancel-key 'evil-exchange-cancel)
+      (define-key evil-visual-state-map evil-exchange-cancel-key 'evil-exchange-cancel)))
+#+end_src
 
-Podemos configurar Emacs de forma /programática/ directamente con el archivo ~init.el~ (como lo estamos haciendo aquí) o utilizando [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Easy-Customization.html][su asistente interactivo de configuración]]. Si optamos por la segunda alternativa, las opciones que configure el usuario serán [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Saving-Customizations.html][guardadas por omisión]] en el archivo ~init.el~, cosa que está lejos de ser ideal. Le indicamos entonces a Emacs que almacene dichas configuraciones interactivas en un archivo separado (~custom.el~) y que las cargue, en caso que el archivo ya exista, con [[https://old.reddit.com/r/emacs/comments/9rrhy8/emacsers_with_beautiful_initel_files_what_about/e8j58jb/][el siguiente código]]:
+Podemos encontrar la mejor demostración de funcionamiento de este paquete en [[http://vimcasts.org/episodes/swapping-two-regions-of-text-with-exchange-vim/][Vimcasts]]. Solo tenemos que cambiar las siguienes cosas con respecto a los ejemplos allí dados:
 
-#+BEGIN_SRC emacs-lisp
-  ;; set the Emacs custom file (create one if it doesn't exist) and load it
+- Combinación clave: =cx= por =gx=.
+- Cancelar una operación: =cxc= por =gX=.
+- Operar sobre una línea completa: =cxx= por =gxx=.
 
-  (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
-  (when (file-exists-p custom-file)
-    (load custom-file))
-#+END_SRC
+Uso básico de este paquete:
 
-Si por alguna razón quisiéramos asegurarnos de crear el archivo ~custom.el~ cuando no exista, podemos utilizar [[https://stackoverflow.com/a/14072295][el siguiente código]]:
+- En modo visual:
+  - Seleccionamos la primera cadena de caracteres con =v{motion}= y presionamos =gx=.
+  - Seleccionamos la segunda cadena de la misma forma y presionamos =gx=.
+- En modo normal:
+  - Marcamos la primera cadena de caracteres con =gx{motion}=.
+  - Marcamos la segunda cadena de la misma forma. Notemos que si ={motion}= es igual en ambos casos, bastará con que presionemos =.= para ejecutar el cambio.
 
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; Create custom-file in case it doesn't exist
+*** evil-unimpaired: operaciones de conveniencia
 
-  (unless (file-exists-p custom-file)
-    (write-region "" nil custom-file))
-#+END_SRC
+Utilizaremos [[https://github.com/zmaas/evil-unimpaired][evil-unimpaired]] para tener acceso a la siguiente combinación de teclas en modo normal con la ventaja de que al finalizarlas seguiremos en dicho modo:
 
-Para hacernos una idea de otras operaciones que podemos ejecutar sobre un archivo podemos consultar [[http://ergoemacs.org/emacs/elisp_write_file.html][esta guía]].
+- =[<SPC>=: agregar una línea en blanco sobre la actual.
+- =]<SPC>=: agregar una línea en blanco bajo la actual.
 
-*** Ajustar el calendario
+La lista de todas las combinaciones posibles se encuentra en la [[https://github.com/zmaas/evil-unimpaired/tree/2a31d10fac00488d9786e009d21d27bce7fef317?tab=readme-ov-file#default-pairs][documentación]] del paquete. Podemos, además, entender la lógica tras estas elecciones visitando la página en GitHub de [[https://github.com/tpope/vim-unimpaired/tree/6d44a6dc2ec34607c41ec78acf81657248580bf1][vim-impaired]], el paquete de Vim en el que se basa evil-unimpaired.
 
-Como es de esperar, el calendario está configurado para los usuarios de Estados Unidos. Lo modificamos entonces para que las semanas comiencen los lunes con la siguiente instrucción:
+#+name: evil-unimpaired-config
+#+begin_src emacs-lisp
+  ;; configuración de evil-unimpaired
+  (use-package evil-unimpaired
+    :straight
+    (evil-unimpaired :type git
+                     :host github :repo "zmaas/evil-unimpaired")
+    :config
+    (evil-unimpaired-mode))
+#+end_src
 
-#+BEGIN_SRC emacs-lisp
-  ;; start the week on Monday
+*** evil-terminal-cursor-changer: cambiar el aspecto del cursor en la terminal
 
-  (setq calendar-week-start-day 1)
-#+END_SRC
+Es probable que el cursor no nos indique en qué modo de Evil nos encontramos cuando ejecutamos Emacs en una terminal. Utilizamos [[https://github.com/7696122/evil-terminal-cursor-changer][evil-terminal-cursor-changer]] ("etcc") para corregir ese hecho.
 
-Si deseamos que el calendario esté en español, debemos configurar las variables relevantes a mano, lo que logramos con [[https://github.com/templix/dotemacs/blob/e4ceaf40f0fd9727681332a68fe1ce1b4f938b75/dotemacs.el#L231][las siguientes instrucciones]] (notemos que el orden que allí se presenta estaría equivocado pues las listas deberían partir los domingo, independiente del valor de =calendar-week-start-day=):
+#+name: evil-terminal-cursor-changer-config
+#+begin_src emacs-lisp
+  ;; configuración de evil-terminal-cursor-changer
+  (unless (display-graphic-p)
+    (use-package evil-terminal-cursor-changer
+      :config
+      (evil-terminal-cursor-changer-activate)))
+#+end_src
 
-#+BEGIN_SRC emacs-lisp :tangle no
-;; how to modify calendar-relevant variables
-;; these can also be specified per file; see
-;; https://emacs.stackexchange.com/q/2236/26521
+Notemos que existirían soluciones alternativas que no requerirían la instalación de ningún paquete. Optamos, sin embargo, por usar "etcc" porque funciona correctamente.
 
-(setq calendar-day-name-array ["Domingo" "Lunes" "Martes" "Miércoles" "Jueves" "Viernes" "Sábado"]
-      calendar-day-abbrev-array ["Dom" "Lun" "Mar" "Mié" "Jue" "Vie" "Sáb"]
-      calendar-day-header-array ["Do" "Lu" "Ma" "Mi" "Ju" "Vi" "Sá"]
-      calendar-month-name-array ["Enero" "Febrero" "Marzo" "Abril" "Mayo" "Junio" "Julio" "Agosto" "Septiembre" "Octubre" "Noviembre" "Diciembre"]
-      calendar-month-abbrev-array ["Ene" "Feb" "Mar" "Abr" "May" "Jun" "Jul" "Ago" "Sep" "Oct" "Nov" "Dic"])
-#+END_SRC
+Otras soluciones posibles:
 
-** Codificación UTF-8 predeterminada
+- Configurando las variables de Evil directamente: [[https://emacs.stackexchange.com/a/7404][StackExchange]], [[https://www.reddit.com/r/emacs/comments/4rd44a/how_to_change_cursor_in_evil_mode/][Reddit]].
+- Utilizando funciones auxiliares: [[https://emacs.stackexchange.com/a/14930][StackExchange]].
 
-La información disponible en Internet sobre cómo configurar Emacs para que utilice la codificación UTF-8 de forma predeterminada es bastante confusa. La alternativa que aquí reproduzco [[https://github.com/hlissner/doom-emacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L168][es la utilizada por Doom Emacs en su configuración]]:
+*** evil-owl: inspector de registros
 
-#+BEGIN_SRC emacs-lisp
-  ;; Contrary to what many Emacs users have in their configs, you really don't
-  ;; need more than this to make UTF-8 the default coding system:
+Tratar de recordar qué información está contenida en cada uno de los registros de Evil es poco práctico. Utilizamos [[https://github.com/mamapanda/evil-owl][evil-owl]] para que nos muestre los registros disponibles y su contenido cada vez que detecta que buscamos acceder a ellos.
 
-  (when (fboundp 'set-charset-priority)
-    (set-charset-priority 'unicode))       ; pretty
-  (prefer-coding-system 'utf-8)            ; pretty
-  (setq locale-coding-system 'utf-8)       ; please
+#+name: evil-owl-config
+#+begin_src emacs-lisp
+  ;; configuración de evil-owl
+  (use-package evil-owl
+    :config
+    (setq evil-owl-max-string-length 500)
+    (add-to-list 'display-buffer-alist
+                 '("*evil-owl*"
+                   (display-buffer-in-side-window)
+                   (side . bottom)
+                   (window-height . 0.3)))
+    (evil-owl-mode))
+#+end_src
 
-  ;; The clipboard's on Windows could be in a wider (or thinner) encoding than
-  ;; utf-8 (likely UTF-16), so let Emacs/the OS decide what encoding to use there.
+Notemos que también es posible especificar la cantidad de líneas que debe desplegar el /buffer/ con =windows-height=. En ese caso no lo configuraremos con un número real, sino que con un [[https://www.reddit.com/r/emacs/comments/10fgwnh/comment/j4z0d6w/][número entero]].
 
-  (unless IS-WINDOWS
-    (setq selection-coding-system 'utf-8)) ; with sugar on top
-#+END_SRC
+** Interacción de Emacs con el sistema operativo anfitrión
 
-No obstante lo anterior, considero que nunca está de más incluir la siguiente línea al comienzo de nuestros archivos de texto:
+*** TODO simpleclip: administración de portapapeles
 
-#+BEGIN_SRC emacs-lisp :tangle no
-;; -*- coding: utf-8-unix; -*-
-#+END_SRC
+- [ ] NOTA: no funciona en WSL. Es por ello que no lo exportamos a ~init.el~ pues estoy buscando configurar Emacs en esa plataforma. Pero sí funciona en macOS, de modo que lo correcto sería configurarlo en ese sistema operativo
+- [[https://vi.stackexchange.com/questions/84/how-can-i-copy-text-to-the-system-clipboard-from-vim][SE: portapapeles en los distintos SO]].
 
-Con ello nos aseguramos de que Emacs interprete y codifique nuestros archivos con UTF-8.
+El portapapeles del sistema operativo anfitrión y el de Emacs son distintos, pero interactúan entre ellos. La distinción entre ellos se vuelve evidente al utilizar Evil. Podemos separar los portapapeles de manera estricta para simplificar su uso con [[https://github.com/rolandwalker/simpleclip][simpleclip]].
 
-* Configuración de Emacs
+#+name: simpleclip-config
+#+begin_src emacs-lisp :tangle no
+  ;; configuración de simpleclip
+  (use-package simpleclip
+    :after (evil)
+    :config
+    (simpleclip-mode 1))
+#+end_src
 
-** Experiencia general de usuario
+Con Evil y simpleclip podemos ahora manejar el portapapeles de Emacs de la misma forma como lo hacemos en Vim. A la vez, podemos acceder al portapapeles del sistema operativo anfitrión de la forma habitual.
 
-*** TODO Backups
+*** undo-fu: hacer y deshacer (/redo/ y /undo/) lineales
 
-*** TODO Ivy · Asistente de completación interactivo
+Emacs implementa las acciones de hacer y deshacer con una lógica de árboles que es poderosa, pero que no es intuitiva para la persona común. Para hacer que el programa se ajuste al funcionamiento que comparten todas las aplicaciones modernas utilizamos [[https://codeberg.org/ideasman42/emacs-undo-fu][undo-fu]].
 
-[[https://github.com/abo-abo/swiper#ivy][Ivy]] es un asistente de completación que podemos utilizar en diversos ámbitos de Emacs, como cuando queremos cambiar de /buffer/, estamos ingresando una función con ~M-x~ o queremos abrir un archivo, entre muchos otros. Funciona presentándonos una lista de alternativas para completar lo que estamos escribiendo, lista que se va actualizando a medida que ingresamos nuevos caracteres. Esto nos permite acotar las alternativas posibles rápidamente para dar con el resultado que buscábamos.
+#+name: undo-fu-config
+#+begin_src emacs-lisp
+  ;; configuración de undo-fu
+  (use-package undo-fu
+    :after (evil)
+    :config
+    (setq undo-fu-ignore-keyboard-quit t)
+    (global-set-key (kbd "M-z")   'undo-fu-only-undo)
+    (global-set-key (kbd "M-S-z") 'undo-fu-only-redo))
+#+end_src
 
-Configuramos Ivy de forma básica de la siguiente forma:
+** Paquetes de conveniencia
 
-#+BEGIN_SRC emacs-lisp
-  ;; minibuffer completion assistant
+*** yasnippet: expansión de texto
 
+[[https://github.com/joaotavora/yasnippet][Yasnippet]] es un administrador de plantillas para Emacs. Nos permite expandir abreviaciones de acuerdo a plantillas predefinidas.
+
+#+name: yasnippet-config
+#+begin_src emacs-lisp
+  ;; configuración de yasnippet
+  (use-package yasnippet
+    :init
+    (yas-global-mode 1)
+    :config
+    (add-to-list #'yas-snippet-dirs (locate-user-emacs-file "snippets")))
+#+end_src
+
+Podemos apoyarnos en la [[http://joaotavora.github.io/yasnippet/snippet-development.html][documentación oficial]] para escribir nuestras plantillas, pero es más sencillo seguir [[http://web.archive.org/web/20230329004031/https://howardism.org/Technical/Emacs/templates-tutorial.html][esta guía]] de Howard Abrams.
+
+En la práctica, debemos tener presente que las plantillas serán almacenadas en el directorio =snippets= de nuestra configuración y que debemos [[http://joaotavora.github.io/yasnippet/snippet-organization.html#org7468fa9][organizarlas en carpetas]] de acuerdo al tipo de archivo sobre el que operarán (formalmente, las organizamos de acuerdo a los modos de Emacs).
+
+Podemos ver un ejemplo de una estructura de carpetas real visitando el [[https://github.com/AndreaCrotti/yasnippet-snippets/tree/e6ec9f1822913cea7dc67cde6aeb8f2625980950/snippets][repositorio]] no oficial de /snippets/ de Andrea Crotti. En pequeña escala, esta lucirá de la siguiente manera:
+
+#+begin_example
+~/.emacs.d/snippets/
+├── emacs-lisp-mode
+├── go-mode
+├── latex-mode
+├── org-mode
+│   ├── example.yasnippet
+│   └── source.yasnippet
+└── python-mode
+#+end_example
+
+Iniciamos la creación de un /snippet/ con =M-x yas-new-snippet=. Se abrirá un /buffer/ con texto predeterminado donde debemos definir la plantilla. Presionaremos =C-c C-C= cuando estemos listos y seguiremos las indicaciones de Yas para guardar los cambios y cargar la plantilla.
+
+Como referencia, Yas probablemente nos preguntará las siguientes cosas la primera vez que creemos una plantilla:
+
+1. Choose or enter a table (yas guesses org-mode): si se trata de Org-mode, bastará con que presionemos Enter.
+2. [yas] Loaded for org-mode. Also save snippet buffer? (y or n): responderemos =y=.
+3. File to save snippet in: ingresaremos el nombre del archivo. Idealmente, sin espacios y con la extensión =.yasnippet= o simplemente =.yas= para llevar un orden.
+4. Directory '/home/ . . .' does not exist; create? (y or n): respondemos =y=.
+
+*** ivy: asistente de completación de texto
+
+Podemos apoyarnos en [[https://github.com/abo-abo/swiper][Ivy]] en distintos contextos de Emacs para que nos ayude a completar la acción que queremos tomar. Por ejemplo, al comenzar a ingresar algún comando o al intentar cambiar de archivo, Ivy nos irá ofreciendo alternativas de completación que serán cada vez más precisas a medida que ingresamos más caracteres.
+
+#+name: ivy-config
+#+begin_src emacs-lisp
+  ;; configuración de Ivy
   (use-package ivy
     :config
     (ivy-mode 1)
-    (setq ivy-use-virtual-buffers t)
+    ;;(setq ivy-use-virtual-buffers t)
     (setq ivy-count-format "(%d/%d) "))
-#+END_SRC
+#+end_src
 
-Por sí solo, la forma en que Ivy va acotando la lista de resultados es algo básica: solo muestra los resultados que coinciden de forma exacta con la cadena de caracteres que hemos ingresado. Si esto no nos parece suficiente y preferimos que Ivy haga búsquedas difusas (/fuzzy/), podemos incluir la siguiente instrucción en la sección ~:config~ anterior:
+Notemos que =straight.el= nos ayuda aquí a descargar el paquete correcto: el repositorio de GitHub donde está alojado =ivy.el= carece de orden y mezcla 3 paquetes relacionados, pero distintos: Ivy, Counsel y Swiper.
 
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; ivy fuzzy search (to use preferably with the flx package)
+Podemos corroborar que la receta para instalar Ivy es la correcta y que =straight.el= no activa ninguno de los otros paquetes asociados ejecutando =M-x straight-get-recipe=.
 
-  (setq ivy-re-builders-alist '((t . ivy--regex-fuzzy)))
-#+END_SRC
+*** which-key: asistente de completación para atajos de teclado
 
-Dado que la cantidad de resultados que en este caso Ivy tendría que procesar, lo usual es activar esta opción [[https://www.wisdomandwonder.com/article/10795/emacsorg-mode-migrate-from-ido-to-ivy-in-one-quick-step][solo en conjunto]] con el paquete [[https://github.com/lewang/flx][~flx~]], el que se encarga de procesar y /rankear/ los resultados rápidamente.
+El número de comandos que Emacs nos ofrece a través de atajos de teclado es enorme y no será extraño que olvidemos la secuencia exacta de aquellos que no utilizamos a menudo. En estos casos podemos utilizar las sugerencias de which-key para completar aquellos atajos que no recordamos correctamente.
 
-Ivy ofrece un gran número de opciones configurables. Podemos observar cómo configurar algunas de ellas consultando [[https://github.com/hlissner/doom-emacs/blob/8024f4edf918a1c909ff5edc4f35b8f7f7dbff4e/modules/completion/ivy/config.el][el código fuente de Doom Emacs]]. También tenemos a nuestra disposición el [[https://oremacs.com/swiper/][manual de Ivy]] y [[https://writequit.org/denver-emacs/presentations/2017-04-11-ivy.html][esta guía de Writequit]], muy clara, si bien algo vieja (2017).
-
-Notemos que Ivy no es el único paquete que presta la utilidad de completación. Emacs ofrece por omisión [[https://www.gnu.org/software/emacs/manual/html_mono/ido.html][una alternativa]] en apariencia rudimentaria, pero extremadamente efectiva, llamada [[https://www.masteringemacs.org/article/introduction-to-ido-mode][Ido]]. Este paquete es compatible con ~flx~, lo que lo hace aún más atractivo.
-
-Otra alternativa, muy popular, es [[https://github.com/emacs-helm/helm][Helm]]. Podemos encontrar una comparación de 2016 entre Ivy y Helm (a favor del primero) [[https://sam217pa.github.io/2016/09/13/from-helm-to-ivy/][aquí]] y un hilo de Reddit sobre ambos asistentes de completación [[https://old.reddit.com/r/emacs/comments/bsc8pc/why_did_you_stop_using_helm/][aquí]]. Al día de hoy, el desarrollo de Helm está abandonado, por lo que Ivy asoma como una alternativa superior para aquellos usuarios que nunca llegaron a probar Helm y que buscan algo más poderoso que Ido.
-
-**** TODO Algo más
-
-Explorar ~ivy-use-selectable-prompt~.
-
-*** Swiper · Búsqueda avanzada
-
-Por omisión, Emacs nos facilita la función ~isearch-forward~ (asociada con ~C-s~) para buscar una palabra (cadena de caracteres en general) en el /buffer/ actual. Luego, presionando ~C-s~ repetidamente podemos navegar hacia adelante entre todos los resultados encontrados (~C-r~ para navegar en reversa), lo que es de mucha utilidad.
-
-[[https://github.com/abo-abo/swiper#swiper][Swiper]] presta la misma función, pero implementada de una forma que me parece más atractiva: no tan solo nos permite navegar entre los resultados, sino que los muestra resumidos en un /minibuffer/,
-
-Configuramos Swiper con el siguiente código (notemos que hace uso de Ivy, otro paquete del mismo autor):
-
-#+BEGIN_SRC emacs-lisp
-  ;; better search function
-
-  (use-package swiper
-    :after (ivy)
+#+name: which-key-config
+#+begin_src emacs-lisp
+  ;; configuración de which-key
+  (use-package which-key
     :config
-    (setq ivy-wrap t)
-    ;; :commands + :init -> :bind with conditionals
-    :commands
-    swiper-isearch
-    :init
-    (if IS-MAC
-        (bind-key "s-f" 'swiper-isearch)
-      (bind-key "C-f" 'swiper-isearch)))
-#+END_SRC
+    (setq echo-keystrokes 0.4)
+    (which-key-mode 1))
+#+end_src
 
-Con lo anterior asociamos ~swiper-isearch~ al atajo ~s-f~ en macOS y ~C-f~ en los demás sistemas operativos. Esto nos permite seguir accediendo a ~isearch-forward~ con ~C-s~, en caso que lo estimemos necesario.
+Sobreescribimos el valor de =echo-keystrokes= (una variable nativa de Emacs) para que se tome 0.4 segundos de pausa antes de comenzar a darnos retroalimentación sobre los comandos que estamos introduciendo.
 
-*** Ejecutar siempre el archivo de código Emacs-lisp más nuevo
+*** recentf: lista de los últimos archivos visitados
 
-Para asegurarnos de ejecutar siempre el código Emacs-lisp más nuevo (independiente de que esté compilado o no), utilizamos [[https://github.com/bbatsov/prelude/blob/0a062e74de49c225eef5ed496adf45f93158ec9c/init.el#L51][la siguiente instrucción]]:
+Nos apoyamos en =use-package= para configurar [[https://www.gnu.org/software/emacs/manual/html_node/emacs/File-Conveniences.html][recentf]], un paquete nativo de Emacs que mantiene una lista de los últimos archivos que hemos abierto.
 
-#+BEGIN_SRC emacs-lisp
-  ;; change loading order preference (.elc, and then .el) to whichever file is newer
-
-  (setq load-prefer-newer t)
-#+END_SRC
-
-Notemos que esto no le indica a Emacs que debe compilar el código fuente, solo que ejecute aquel que sea más nuevo. Si además quisiéramos que Emacs compilara de forma automática los archivos ~.el~, podemos utilizar el paquete [[https://github.com/emacscollective/auto-compile#setup][~auto-compile~]].
-
-*** =recentf= · Lista de los últimos archivos visitados
-
-Un paquete que debiese estar activado por omisión –pero no lo está– es =recentf=. Este nos permite acceder a la [[http://ergoemacs.org/emacs/emacs_recentf.html][lista de los últimos archivos abiertos]] en Emacs. Configuramos sus elementos más básicos de la siguiente manera:
-
-#+BEGIN_SRC emacs-lisp
-  ;; keep a list of recently opened files for easy access
-
+#+name: recentf-config
+#+begin_src emacs-lisp
+  ;; configuración de recentf
   (use-package recentf
     :config
     (recentf-mode 1)
     (setq recentf-max-menu-items 10)
     (setq recentf-max-saved-items 15)
     :bind
-    ("C-x C-r" . recentf-open-files))
-#+END_SRC
+    ("C-c r" . recentf-open-files))
+#+end_src
 
-La variable =recentf-max-menu-items= controla la cantidad de archivos que se mostrarán en la lista de recientes, mientras que =recentf-max-saved-items= lleva cuenta de la cantidad máxima de archivos de la lista que deben ser guardados (lo que se hará [[https://www.emacswiki.org/emacs/RecentFiles#toc1][cada vez que se cierre Emacs]]).
+Podemos leer un poco acerca del funcionamiento de recentf en [[http://xahlee.info/emacs/emacs/emacs_recentf.html][xahlee.info]].
 
-Para acceder a la lista de archivos recientes presionamos (como indicamos en la configuración) ~C-x C-r~ (otra alternativa es seleccionar =File > Open Recent= en el menú de Emacs).
+*** company: asistente para completar instrucciones
 
-Podemos configurar varias cosas más del paquete. Por ejemplo, para que no se muestre la ruta completa a un archivo (usualmente, =~= en lugar de =/home/nombre_de_usuario=), podemos incluir [[https://www.reddit.com/r/emacs/comments/bebics/can_i_change_recentf_stored_file_name_to_starting/el569hb/][la siguiente instrucción]] en la sección =:config= del código anterior:
+Mientras más tiempo utilicemos Emacs, más probable es que terminemos programando, al menos ocasionalmente, en su dialecto de Lisp para configurarlo y adaptarlo a nuestras preferencias. Es razonable esperar que Emacs nos ayude a hacerlo completando las instrucciones que vamos ingresando. Esta funcionalidad está presente en el programa, pero no se activa de manera automática.
 
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; recentf: shorten file paths
+Utilizaremos [[https://company-mode.github.io/][company]] para agilizar el proceso de autocompletado. Sin paquetes adicionales, company nos ayudará cuando programemos en Emacs Lisp. Si deseáramos ayuda con otros lenguajes tendremos que instalar algún [[https://en.wikipedia.org/wiki/Language_Server_Protocol][LSP]] (/Language Server Protocol/) del lenguaje deseado y configurarlo.
 
-  (setq recentf-filename-handlers
-        (append '(abbreviate-file-name) recentf-filename-handlers))
-#+END_SRC
+#+name: company-config
+#+begin_src emacs-lisp :tangle no
+  ;; configuración de company
+  (use-package company
+    :hook ((prog-mode . company-mode)
+  	 )
+    :bind (:map company-active-map
+  	      ("<tab>" . company-complete-selection))
+    )
+#+end_src
 
-El valor de la variable =recentf-max-saved-items= puede tornarse relevante cuando [[https://stackoverflow.com/a/8024412][ocupamos paquetes que nos asisten para completar]] comandos o nombres de archivo (como =ido= y =helm=). Una manera de configurar =recentf= con =ido= se puede encontrar [[https://masteringemacs.org/article/find-files-faster-recent-files-package][aquí]].
+*** command-log-mode: registro de las teclas presionadas
 
-Finalmente, podemos examinar la forma en que [[https://github.com/hlissner/doom-emacs/blob/8024f4edf918a1c909ff5edc4f35b8f7f7dbff4e/core/core-editor.el#L221][el autor de Doom Emacs configura]] ~recentf~ para conocer otras opciones que ofrece el paquete.
+[[https://github.com/lewang/command-log-mode][command-log-mode]] es un paquete pensado para ser utilizado durante demostraciones de Emacs. Registra en un /buffer/ auxiliar todas las teclas presionadas junto a sus funciones asociadas.
 
-*** =undo-fu= · Deshacer y rehacer (/undo/ y /redo/)
+Abrimos dicho /buffer/ con =M-x clm/open-command-log-buffer=.
 
-La implementación que hace Emacs de las acciones /undo/ (deshacer) y /redo/ (rehacer) es poderosa y a la vez confusa. Para poder abstraernos de las particularidades de esta implementación y así deshacer y rehacer nuestras acciones de forma intuitiva (es decir, de la misma forma como funciona en casi la totalidad de los programas), utilizamos [[https://gitlab.com/ideasman42/emacs-undo-fu][~undo-fu~]]:
+La documentación del paquete sugiere asociar el modo de registro de comandos a un tipo de archivo utilizando un =hook=. Lo agregaremos en la configuración a modo de ejemplo asociándolo con Org mode, pero en la práctica será mejor iniciar este modo manualmente cuando lo necesitemos.
 
-#+BEGIN_SRC emacs-lisp
-  ;; configuration of undo-fu: undo and redo that make sense
+#+name: command-log-mode-config
+#+begin_src emacs-lisp :tangle no
+  (use-package command-log-mode
+    ;; :hook
+    ;; (org-mode . command-log-mode)
+    )
+#+end_src
 
-  (use-package undo-fu
-    :after (evil)  ;; tuve que agregarlo 20200314
+** Apariencia de Emacs
+
+Cargaremos el código de los temas, pero no activaremos ninguno. Eso lo haremos más adelante en la configuración, luego de haber cargado todos los paquetes que deseamos utilizar.
+
+*** Con un fondo claro
+
+**** Leuven: estridente, pero de una forma que lo hace funcional
+
+La apariencia de Emacs por omisión es bastante agradable, pero le faltan algunas cosas como destacar los bloques de código para poder distinguirlos a golpe de vista mientras navegamos nuestros archivos Org.
+
+La paleta de colores de [[https://github.com/fniessen/emacs-leuven-theme][Leuven]] es estridente, pero define de manera la apariencia de múltiples elementos de la interfaz de manera única, permitiéndonos hacernos una idea mental rápida de la estructura de nuestros documentos de Org.
+
+#+name: emacs-leuven-theme-config
+#+begin_src emacs-lisp
+  ;; configuración de emacs-leuven-theme
+  (use-package leuven-theme
+    ;; :config
+    ;; (load-theme 'leuven t)
+    )
+#+end_src
+
+*** Con un fondo oscuro
+
+**** Doom-City-Lights: paleta de colores apacible
+
+Los desarrolladores de Doom Emacs mantienen [[https://github.com/doomemacs/themes][~doom-themes~]], un repositorio de temas para su distribución que está abierto a toda la comunidad. [[https://github.com/doomemacs/themes/tree/screenshots][En este enlace]] podemos encontrar capturas de pantalla de cada uno de ellos.
+
+En el código siguiente seleccionamos el tema ~doom-city-lights~, pero esto puede cambiarse fácilmente.
+
+#+name: doom-themes-config
+#+begin_src emacs-lisp
+  (use-package doom-themes
     :config
-    (setq undo-fu-ignore-keyboard-quit t)
+    ;; Global settings (defaults)
+    (setq doom-themes-enable-bold t    ; if nil, bold is universally disabled
+          doom-themes-enable-italic t) ; if nil, italics is universally disabled
+    ;; (load-theme 'doom-city-lights t)
 
-  ;;  (global-undo-tree-mode -1)
-  ;;  (define-key evil-normal-state-map "u" 'undo-fu-only-undo)
-  ;;  (define-key evil-normal-state-map "\C-r" 'undo-fu-only-redo)
+    ;; Enable flashing mode-line on errors
+    (doom-themes-visual-bell-config)
+    ;; Corrects (and improves) org-mode's native fontification.
+    (doom-themes-org-config))
 
-    :bind
-    ("s-z" . undo-fu-only-undo)
-    ("s-Z" . undo-fu-only-redo)
-    ("s-y" . undo-fu-only-redo))
-#+END_SRC
+  (use-package solaire-mode
+    :after (doom-themes))
+#+end_src
 
-También podríamos haber utilizado [[http://www.dr-qubit.org/undo-tree.html][~undo-tree~]] (mi alternativa favorita), pero dicho paquete aparentemente no es tan confiable como uno querría. De todas formas, si quisiéramos utilizarlo, podemos configurarlo de la siguiente manera:
+**** ample-theme-flat: abanico de colores limitado
 
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; unleash the power of Emacs' undo/redo
+El paquete ~ample-theme~ contiene 3 temas, dos de ellos con fondos claros. Seleccionamos aquí la variante ~ample-flat~, la que apenas tiene gradación entre los distintos colores de la paleta, pero podemos activar cualquiera de los 3 con facilidad.
 
-  (use-package undo-tree
+#+name: ample-theme-flat-config
+#+begin_src emacs-lisp
+  (use-package ample-theme
+    :init
+    (load-theme 'ample t t)
+    (load-theme 'ample-flat t t)
+    (load-theme 'ample-light t t)
+    ;; (enable-theme 'ample-flat)
+    )
+#+end_src
+
+Este tema sería más útil si coloreara el fondo de los códigos incluidos en documentos Org.
+
+*** doom-modeline: barra de estados "minimalista"
+
+Si bien se describe como /minimalista/, la barra de estados que despliega [[https://github.com/seagle0128/doom-modeline][doom-modeline]] es informativa, además de atractiva.
+
+#+name: doom-modeline-config
+#+begin_src emacs-lisp :tangle no
+  ;; configuración de doom-modeline
+  ;; antes instalamos nerd-fonts, su único requerimiento
+  ;;(use-package nerd-icons
+    ;; :custom
+    ;; The Nerd Font you want to use in GUI
+    ;; "Symbols Nerd Font Mono" is the default and is recommended
+    ;; but you can use any other Nerd Font if you want
+    ;; (nerd-icons-font-family "Symbols Nerd Font Mono")
+    ;;)
+  (use-package doom-modeline
+    ;;:requires (nerd-icons)
+    :init
+    ;;(unless (display-graphic-p)
+      (setq doom-modeline-icon nil)
+      ;;)
+    (doom-modeline-mode 1)
+    ;;:config
+    ;; tiene mal desempeño en Windows
+    ;;(display-battery-mode t)
+    )
+#+end_src
+
+Es posible [[https://github.com/seagle0128/doom-modeline/tree/29a4bfc99962ec0d55c48ff5a503a6d722dc80a8?tab=readme-ov-file#customize][configurar muchos aspectos]] de doom-modeline. Sin embargo, como la configuración por omisión es buena, nos quedamos con dichos valores.
+
+Consideramos activar [[https://irreal.org/blog/?p=833][=display-battery-mode=]], modo que es parte de Emacs, para desplegar el porcentaje de batería restante en la barra de estado. Lo descartamos debido a que parece introducir inestabilidades cuando Emacs corre en WSL.
+
+Lo que no podemos pasar por alto es que será obligatorio instalar la fuente que utiliza este paquete para adornar la barra de estados si es deseamos que ella muestre íconos. En caso de que el código propuesto falle en hacerlo, podemos [[https://github.com/seagle0128/doom-modeline/tree/29a4bfc99962ec0d55c48ff5a503a6d722dc80a8?tab=readme-ov-file#faq][instalarlas manualmente]] ejecutando =M-x nerd-icons-install-fonts=.
+
+Notemos, sin embargo, que [[https://github.com/doomemacs/doomemacs/issues/6173][no hay forma]] de hacer que los íconos se desplieguen correctamente en una terminal. Es por eso que es importante verificar antes que estamos usando la GUI de Emacs si queremos activarlos.
+
+** Trabajo con código fuente
+
+Podemos utilizar Emacs como un entorno de desarrollo moderno a gracias a ~treesitter~ y a los ~LSP~ (/Language Server Protocol/).
+
+Emacs 29 y posteriores poseen soporte nativo para ~treesitter~, pero el programa debe ser compilado con esa opción. Algunas distribuciones de Linux como openSUSE Tumbleweed ofrecen Emacs con esta opción activada, pero este podría no ser el caso en otras distribuciones.
+
+Si deseamos sacar el máximo provecho a los ~LSP~, será recomendable instalar la librería ~libjansson~ y compilar Emacs con acceso a ella. Si no lo hacemos, Emacs utilizará su propia librería para procesar los archivos JSON cuyo desempeño es comparativamente pobre.
+
+Podemos seguir [[http://web.archive.org/web/20240405161112/https://www.masteringemacs.org/article/speed-up-emacs-libjansson-native-elisp-compilation][esta guía]] para compilar Emacs de forma básica en nuestro computador (con soporte para ~libjansson~ y para compilar código de Emacs Lisp) y [[http://web.archive.org/web/20240412172155/https://www.masteringemacs.org/article/how-to-get-started-tree-sitter][esta]] para poder trabajar además con ~treesiter~.
+
+*** Soporte para Lua
+
+Emacs no ofrece soporte nativo para Lua, de modo que debemos instalar un paquete para ello.
+
+#+name: config-lua-mode
+#+begin_src emacs-lisp :tangle no
+  (use-package lua-mode)
+#+end_src
+
+*** TODO Configuración de tree-sitter
+
+Configuraremos tree-sitter para soportar Lua.
+
+#+name: config-tree-sitter
+#+begin_src emacs-lisp :tangle no
+  ;; configuración de tree-sitter
+  (if (and (fboundp 'treesit-available-p)
+  	 (treesit-available-p)
+  	 (executable-find "gcc"))
+      (progn
+        ;; grammars to use
+        (setq treesit-language-source-alist
+  	    '((lua . ("https://github.com/Azganoth/tree-sitter-lua"))))
+        ;; install grammars
+        (unless (treesit-language-available-p 'lua)
+  	(treesit-install-language-grammar 'lua))
+        ;; activate installed grammars
+        (setq major-mode-remap-alist
+  	    '((lua-mode . lua-ts-mode)))
+        ))
+#+end_src
+
+A la fecha de redacción, [[http://web.archive.org/web/20240213011810/https://robbmann.io/posts/emacs-treesit-auto/][estas]] son algunas de las definiciones de lenguaje que podemos utilizar con tree-sitter:
+
+#+name: tree-sitter-grammars
+#+begin_src emacs-lisp :tangle no
+  (setq treesit-language-source-alist
+        '((bash . ("https://github.com/tree-sitter/tree-sitter-bash"))
+  	(c . ("https://github.com/tree-sitter/tree-sitter-c"))
+  	(cmake . ("https://github.com/uyha/tree-sitter-cmake"))
+  	(common-lisp . ("https://github.com/theHamsta/tree-sitter-commonlisp"))
+  	(cpp . ("https://github.com/tree-sitter/tree-sitter-cpp"))
+  	(css . ("https://github.com/tree-sitter/tree-sitter-css"))
+  	(csharp . ("https://github.com/tree-sitter/tree-sitter-c-sharp"))
+  	(elisp . ("https://github.com/Wilfred/tree-sitter-elisp"))
+  	(go . ("https://github.com/tree-sitter/tree-sitter-go"))
+  	(go-mod . ("https://github.com/camdencheek/tree-sitter-go-mod"))
+  	(html . ("https://github.com/tree-sitter/tree-sitter-html"))
+  	(js . ("https://github.com/tree-sitter/tree-sitter-javascript" "master" "src"))
+  	(json . ("https://github.com/tree-sitter/tree-sitter-json"))
+  	(lua . ("https://github.com/Azganoth/tree-sitter-lua"))
+  	(make . ("https://github.com/alemuller/tree-sitter-make"))
+  	(markdown . ("https://github.com/ikatyang/tree-sitter-markdown"))
+  	(python . ("https://github.com/tree-sitter/tree-sitter-python"))
+  	(r . ("https://github.com/r-lib/tree-sitter-r"))
+  	(rust . ("https://github.com/tree-sitter/tree-sitter-rust"))
+  	(toml . ("https://github.com/tree-sitter/tree-sitter-toml"))
+  	(tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src"))
+  	(typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src"))
+  	(yaml . ("https://github.com/ikatyang/tree-sitter-yaml"))))
+#+end_src
+
+Podemos consultar todas las definiciones alojadas en el repositorio de tree-sitter en [[https://github.com/tree-sitter-grammars][este enlace]].
+
+** Procesamiento de textos
+
+*** olivetti: centrado del texto en la ventana
+
+Emacs ocupará todo el ancho de la ventana para desplegar el contenido de los /buffer/. Esto nos puede desorientar en el caso de estar trabajando con archivos de prosa como los de Org.
+
+Podemos activar [[https://github.com/rnkn/olivetti][olivetti]] para indicarle a Emacs que deseamos que nos muestre el contenido de los archivos en una columna al centro de la ventana.
+
+#+name: olivetti-config
+#+begin_src emacs-lisp
+  ;; función auxiliar
+  (defun activate-olivetti-mode ()
+    (olivetti-mode 1))
+  ;; configuración de olivetti
+  (use-package olivetti
+    :init
+    (setq olivetti-body-width 86)
+    :hook
+    (text-mode . activate-olivetti-mode))
+#+end_src
+
+Allí le indicamos a Emacs que deseamos utilizar olivetti solo en los /buffer/ de prosa, como los de Org, y no en los archivos de código fuente.
+
+*** ws-butler: corrección de espacios en blanco
+
+Utilizaremos [[https://github.com/hlissner/ws-butler][ws-butler]] para borrar todos los espacios en blanco inútiles que hayan sido añadidos durante la sesión activa. Esto quiere decir que ws-butler no actuará sobre los espacios en blanco que ya estuvieran presentes al abrir el archivo, lo que es una buena estrategia cuando se está trabajando con control de versiones con otras personas.
+
+Llamaremos espacios en blanco inútiles a aquellos espacios que se encuentran, por ejemplo, al final de una línea, así como a las tabulaciones que aparecen en líneas que no contengan texto.
+
+El código de ws-butler se ejecutará cada vez que guardemos el archivo.
+
+La configuración siguiente está [[https://github.com/SkySkimmer/.emacs.d/blob/55404abb2a4261ad14cfc56cc67d1396e40415b1/config.org#ws-butler-unobtrusive-whitespace-remover][adaptada]] del archivo =config.org= del usuario SkySkimmer de GitHub.
+
+#+name: ws-butler-config
+#+begin_src emacs-lisp 
+  ;; configuración de ws-butler
+  (use-package ws-butler
+    :straight
+    (ws-butler :type git
+               :host github :repo "lewang/ws-butler"
+               :fork (:host github :repo "hlissner/ws-butler"))
+    :commands
+    ;; ¿será necesario activarlo si luego lo engancho con hook?
+    (ws-butler-mode)
+    :hook
+    ((prog-mode text-mode) . ws-butler-mode))
+#+end_src
+
+Notemos que utilizaremos el /fork/ del autor de Doom Emacs debido a que anticipamos que este paquete recibirá mantenimiento en caso de que la comunidad encuentre /bugs/ en él.
+
+Existen dos alternativas comparativamente más agresivas a ws-butler que operan sobre el archivo completo y que pueden ser ejecutadas con =M-x= en caso de necesitarlas:
+
+- =delete-trailing-whitespace=: borra espacios al final de las líneas.
+- =whitespace-cleanup=: borra multitud de espacios en blanco inútiles (ver su documentación con =C-h f=).
+
+También podríamos configurar Emacs con el siguiente código para que ejecute ambas funciones sobre un archivo cada vez que lo guardamos:
+
+#+name: ws-butler-aggresive-alternative
+#+begin_src emacs-lisp :tangle no
+  ;; alternativa agresiva a ws-butler
+  (add-hook 'after-save-hook #'whitespace-cleanup)
+  (add-hook 'after-save-hook #'delete-trailing-whitespace)
+#+end_src
+
+*** TODO flyspell: corrección ortográfica
+
+Podemos invocar el corrector ortográfico manualmente o pedirle a Emacs que esté revisando lo que escribimos en todo momento. Para lograr lo segundo utilizaremos [[http://www-sop.inria.fr/members/Manuel.Serrano/flyspell/flyspell.html][flyspell]].
+
+El paquete flyspell no incorpora herramientas de corrección de texto ni diccionarios. Solo nos permite usarlos. Tendremos que instalar dichos recursos por separado.
+
+Actualmente existen solo dos herramientas de código libre recomendables para la corrección de textos escritos en los idiomas europeos más extendidos: [[https://en.wikipedia.org/wiki/GNU_Aspell][GNU Aspell]] y [[https://en.wikipedia.org/wiki/Hunspell][Hunspell]].
+
+Podemos ocupar Aspell o Hunspell por sí solas o a través de [[https://abiword.github.io/enchant/][Enchant]], un /wrapper/ que define una API única con la que configurar y acceder a múltiples correctores de ortografía (entre los que se cuentan los dos mencionados) sin tener que preocuparse de los detalles de la implementación de cada uno de ellos. Quienes deseen probar Enchant probablemente quieran echar un vistazo a [[https://github.com/minad/jinx][jinx]], un paquete para Emacs que provee corrección ortográfica a través de dicho programa.
+
+Optaremos en este caso por configurar el corrector ortográfico específico que usaremos: Hunspell.
+
+Utilizaremos Hunspell debido a que es el corrector más utilizado por aplicaciones populares como Firefox —lo que da confianza sobre el futuro de Hunspell—, porque es fácil de integrar con flyspell y porque cuenta con diccionarios localizados para distintas variedades del español, incluyendo la de Chile (difícil saber acaso esto tiene alguna implicancia práctica, pero me agrada la idea de su existencia).
+
+Habiendo ya seleccionado Hunspell ahora resta buscar diccionarios que sean compatibles con él. Es posible que nuestra distribución de Linux solo nos ofrezca diccionarios compatibles con Aspell o MySpell. Como los diccionarios de MySpell son compatibles con Hunspell, son ellos los que debemos instalar.
+
+Resumiendo lo recién expuesto, tendríamos que ejecutar una instrucción como la siguiente para instalar las herramientas que nos permitirán corregir la ortografía de nuestros textos (ella en particular es válida para openSUSE):
+
+#+name: opensuse-hunspell-and-dictionaries
+#+begin_src bash :tangle no
+  sudo zypper in hunspell myspell-es_CL myspell-en_US myspell-de_DE
+#+end_src
+
+En caso de que nuestra distribución no cuente con diccionarios compatibles con MySpell, podemos recurrir al repositorio de [[https://extensions.openoffice.org/en/search?f%5B0%5D=field_project_tags%3A157][extensiones de OpenOffice]]. Los diccionarios que descarguemos de allí tendrán extensión =.oxt=, pero bastará con cambiarla a =.zip= para poder extraer su contenido. Los archivos que necesitaremos estarán en su interior y tendrán extensión =.aff= y =.dic=.
+
+Configuraremos flyspell con el siguiente código:
+
+#+name: spellchecker-config
+#+begin_src emacs-lisp :tangle no
+  ;; configuración del corrector ortográfico
+  (use-package flyspell
+    :init
+    (setq ispell-program-name "hunspell"
+  	;; ispell-really-hunspell t
+  	;; explorar una forma de evaluar primero si existe "es_CL"
+  	ispell-dictionary "es_CL"
+  	ispell-local-dictionary "es_CL"
+  	flyspell-default-dictionary "es_CL"
+  	flyspell-sort-corrections nil ;; ordenar sugerencias por similitud
+  	ispell-local-dictionary-alist
+  	'(("en_US" "[[:alpha:]]" "[^[:alpha:]]" "[’']" t ("-d" "en_US") nil utf-8)
+  	  ("es_CL" "[[:alpha:]]" "[^[:alpha:]]" "" nil ("-d" "es_CL") t utf-8))))
+#+end_src
+
+Los valores pasados a =ispell-local-dictionary-alist= concuerdan con lo documentado en =ispell-dictionary-alist=. En el caso de la configuración del español de Chile, estos son los detalles:
+
+- =DICTIONARY-NAME=: =es_CL=. Puede ser cualquier nombre, es decir, no necesariamente el mismo del diccionario.
+- =CASECHARS=: =[:alpha:]=, /regex/ de los caracteres válidos en una palabra.
+- =NOT-CASECHARS=: =[^:alpha:]=, los caracteres que no forman parte de una palabra.
+- =OTHERCHARS=: un /string/ vacío. Son caracteres incluidos en el /regex/ de =NOT-CASECHARS= que sí podrían ser parte de una palabra. Por ejemplo, en el caso del inglés, el apóstrofe ='= es un caracter válido. Esto no se da en el español estándar, de modo que lo dejamos vacío.
+- =MANY-OTHERCHARS-P=: =nil=. Acaso =OTHERCHARS= puede aparecer más de una vez en una palabra.
+- =ISPELL-ARGS=: =("-d" "es_CL")=, los argumentos a pasar a Hunspell durante su ejecución. Aquí le indicamos que deseamos utilizar los diccionarios =es_CL= y =en_US= simultáneamente.
+- =EXTENDED-CHARACTER-MODE=: =t=, con lo que indicamos que contamos con un diccionario dividido en los archivos =.dic= y =.aff=.
+- =CHARACTER-SET:=: UTF-8.
+
+Para explorar una forma de asociar múltiples diccionarios con un solo idioma podemos consultar [[https://200ok.ch/posts/2020-08-22_setting_up_spell_checking_with_multiple_dictionaries.html][Setting up spell checking with multiple dictionaries in Emacs]].
+
+Si quisiéramos cambiar el diccionario que Hunspell está utilizando debemos ejecutar =M-x ispell-change-dictionary= y seleccionar alguno de los que Emacs nos ofrecerá.
+
+Es importante notar que, de acuerdo a [[https://crysol.org/recipe/2007-03-13/gnu-emacs-ortografa-al-vuelo-con-flyspell.html][una fuente]], no debemos seleccionar diccionarios terminados en "8" como "castellano8" o "deutsch8" si la codificación de nuestro archivo es UTF-8.
+
+Si flyspell no estuviera activo, podemos iniciarlo con =M-x flyspell-mode=. Con este modo activado, Emacs irá revisando la ortografía de cada una de las palabras por las que pasa el cursor. La consecuencia de esto es que Emacs revisará nuestra ortografía a medida que vayamos escribiendo, que es lo usual. Notemos que, dado cómo configuraremos Org-mode más adelante, flyspell se iniciará de forma automática al abrir archivos de Org.
+
+En otras ocasiones no nos bastará con ir revisando la ortografía "al vuelo", sino que querremos revisar un documento completo de una vez. Le pediremos a Emacs que revise el /buffer/ activo con =M-x flyspell-buffer=.
+
+Algo que no haremos en esta configuración, pero que podría ser relevante para algunas personas, es configurar flyspell para que se integre con LaTeX. De acuerdo a la [[http://www-sop.inria.fr/members/Manuel.Serrano/flyspell/flyspell.html][documentación]] (sección "Installation"), lograremos esto con la siguiente instrucción:
+
+#+name: flyspell-latex-config
+#+begin_src emacs-lisp :tangle no
+(put 'LaTex-mode 'flyspell-mode-predicate 'tex-mode-flyspell-verify)
+#+end_src
+
+En cuanto al uso del corrector ortográfico en sí, podemos interactuar con sus sugerencias utilizando el mouse o el teclado. En el primer caso presionaremos el tercer botón del mouse (la rueda) sobre alguna de las palabras que estén marcadas como incorrectas, acción que desplegará un menú contextual con las opciones que tenemos. Ellas incluyen las palabras que el corrector nos sugiere y las opciones "Save word" (guardar la palabra en un diccionario personal), "Accept (session)" (no volver a corregir la palabra durante la sesión) y "Accept (buffer)" (no volver a corregir la palabra en el archivo activo durante esta sesión).
+
+En caso de que el mouse no funcionara de la manera descrita podemos intentar corregir el problema utilizando el [[http://web.archive.org/web/20190925063723/https://joelkuiper.eu/spellcheck_emacs][siguiente código]]:
+
+#+name: spellchecker-mouse-config-macos
+#+begin_src emacs-lisp :tangle no
+  (eval-after-load "flyspell"
+    '(progn
+       (define-key flyspell-mouse-map [down-mouse-3] #'flyspell-correct-word)
+       (define-key flyspell-mouse-map [mouse-3] #'undefined)))
+#+end_src
+
+Para evaluar las opciones que el corrector nos ofrece utilizando el teclado tendremos que presionar =M-$= (=M-x ispell-word=) sobre alguna palabra marcada como incorrecta o bien invocar =M-x ispell= para corregir el texto seleccionado (si no hemos seleccionado nada, el comando operará sobre todo el texto del /buffer/). En cualquiera de estos casos se abrirá un /mini buffer/ auxiliar con las opciones que tenemos para corregir las palabras.
+
+Para proceder con la corrección tendremos que presionar alguna tecla de acuerdo a las siguientes posibilidades:
+
+- Un =dígito=: todas las palabras sugeridas por el corrector están acompañadas de un dígito. Presionando alguno de ellos en nuestro teclado le indica a Emacs que debe reemplazar la palabra marcada como incorrecta con aquella indicada con el dígito.
+- =Espacio=: ignorar esta instancia particular de la palabra. Con esto le pedimos al corrector que ignore dicha instancia particular de la palabra sin decirle acaso ella es correcta o no. Dado lo anterior, la palabra en cuestión seguirá siendo marcada como incorrecta en otras partes del texto.
+- =a=: aceptar que la palabra está bien escrita. Con esto le indicamos al corrector que acepte la palabra como correcta durante la sesión en curso. Volverá a ser marcada como incorrecta en las sesiones siguientes.
+- =A=: como =a=, pero solo durante la sesión en curso y en el /buffer/ activo.
+- =i=: insertar la palabra en el diccionario personal. Con esto le indicamos al corrector que la palabra es correcta y que la guarde en nuestro diccionario personal. Esta palabra nunca volverá a ser marcada como incorrecta.
+- =u=: como =i=, pero guardando la palabra en minúscula.
+- =r=: reemplazar la palabra marcada como incorrecta con una palabra distinta a las sugeridas. Luego de presionar =r= tendremos que escribir la palabra con la que deseamos reemplazar aquella marcada como incorrecta y presionar Enter. El corrector revisará la ortografía de la nueva palabra ingresada.
+- =R=: como =r=, pero dando la posibilidad de reemplazar no tan solo la aparición de la palabra donde estamos actuando, sino también todas sus apariciones en el texto.
+- =q=: abortar el proceso de corrección ortográfica.
+
+Existen [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Spelling.html][otras opciones]], pero con estas debería bastar para hacer un uso efectivo del corrector ortográfico.
+
+Finalmente, cabe mencionar que es posible configurar Emacs para que realice correcciones automáticas. Bajo este esquema, cada vez que corrijamos una palabra, Emacs creará una asociación entre ellas de tal forma que, si volvemos a cometer el mismo error ortográfico (o tipográfico), este será corregido de forma inmediata sin nuestra intervención. Podemos ver el video "[[https://www.youtube.com/watch?v=RtkiHW9yoG0][Spell checking in Emacs]]" (YouTube) para entender cómo funciona y consultar "[[http://endlessparentheses.com/ispell-and-abbrev-the-perfect-auto-correct.html][Ispell and Abbrev, the Perfect Auto-Correct]]" para aprender a configurarlo. En lo personal, prefiero no contar con este beneficio para así forzarme a prestar atención y mejorar mi ortografía.
+
+*** TODO languagetool.el: corrección ortográfica y gramatical
+
+[[https://languagetool.org/][LanguageTool]] es una herramienta de [[https://github.com/languagetool-org/languagetool][código abierto]] que promete corregir no tan solo la ortografía de nuestros textos, sino también la gramática. En su versión pagada también sería capaz de corregir su estilo.
+
+Las pruebas que he realizado con LanguageTool no han dado resultados muy auspiciosos. Si bien han sido muy acotadas, ellas han sido suficientes para disminuir mi entusiasmo original por el programa. Por ejemplo, LanguageTool ha fallado en indicar problemas en frases claramente equivocadas como "Ayer comeré pescado". Tampoco parece acertar al indicar problemas con el uso no estándar de preposiciones.
+
+Podemos probar el funcionamiento del programa sin necesidad de instalarlo accediendo a la [[https://languagetool.org/][página oficial]] del proyecto. Se debe notar nada más que allí podrían estar disponibles opciones del servicio pagado de manera limitada (como la habilidad de parafrasear un texto y, en general, algunas de las [[https://dev.languagetool.org/http-server][herramientas que utilizan AI]]) a las que no tendremos acceso ejecutando la versión local y gratuita de LanguageTool que está disponible para computadores.
+
+Descargaremos el programa desde el [[https://languagetool.org/download/][directorio]] que LanguageTool ofrece para ello. Escogeremos el archivo llamado =LanguageTool-stable.zip= para obtener la versión estable más reciente. Debemos extraer el contenido del archivo =.zip= y tomar nota de dónde lo almacenamos pues necesitaremos dicha ruta para configurar el paquete de Emacs que interactúa con los archivos =.jar= del programa.
+
+Como LanguageTool está escrito en Java, necesitaremos descargar también la máquina virtual de dicho lenguaje. Bastará con obtener una copia de una Java Runtime Environment (JRE), como puede ser la de openJDK, igual o superior a la [[https://github.com/languagetool-org/languagetool?tab=readme-ov-file#alternate-way-to-build-from-source][versión 8]] (esta data de 2014 por lo que será fácil cumplir con este requisito incluso en sistemas GNU/Linux que no ofrecen paquetes actualizados).
+
+A la fecha de redacción parecen existir solo tres paquetes de Emacs diseñados para corregir la ortografía utilizando LanguageTool: [[https://github.com/mhayashi1120/Emacs-langtool][Emacs-langtool]], [[https://github.com/PillFall/languagetool.el][languagetool.el]] y [[https://github.com/emacs-languagetool/lsp-ltex][lsp-ltex]] (cliente para [[https://github.com/valentjn/ltex-ls][ltex-ls]]). Los dos primeros son sencillos: ofrecen una API para interactuar directamente con el archivo =.jar= ejecutable de LanguageTool. El tercero es un cliente para un programa distinto que empaqueta LanguageTool y que hay que descargar por separado.
+
+Proponemos, entonces, escoger uno de los dos primeros paquetes mencionados. Como ambos parecen ser equivalentes en prestaciones, utilizaremos languagetool.el debido a que tiene una [[https://github.com/PillFall/languagetool.el/blob/d62a817efe41bed5c9c971a5eb61ebcb2be229e1/ReadMe.org#languagetoolel][interfaz de resaltado de sugerencias]] más atractiva que la de Emacs-langtool.
+
+#+name: languagetool-el-config
+#+begin_src emacs-lisp :tangle no
+  ;; configuración de LanguageTool
+  (use-package languagetool
+    :commands (languagetool-check
+               languagetool-clear-suggestions
+               languagetool-correct-at-point
+               languagetool-correct-buffer
+               languagetool-set-language
+               languagetool-server-mode
+               languagetool-server-start
+               languagetool-server-stop)
     :config
-    (global-undo-tree-mode 1)
-  ;;  (setq undo-tree-visualizer-timestamps t)
-    :bind
-    ("s-z" . undo-tree-undo)
-    ("s-Z" . undo-tree-redo)
-    ("s-y" . undo-tree-redo))
-#+END_SRC
+    ;; configuramos el idioma de corrección y el idioma materno
+    (languagetool-set-language "Spanish")
+    (setq languagetool-mother-tongue "es")
+    ;; indicamos la ubicación de los archivos jar
+    (setq languagetool-dir "~/software/LanguageTool/")
+    (setq languagetool-console-command
+          (concat languagetool-dir "languagetool-commandline.jar"))
+    (setq languagetool-server-command
+          (concat languagetool-dir "languagetool-server.jar"))
+    ;; opcional: nivel de severidad de la corrección (normal o "PICKY")
+    ;; https://languagetool.org/insights/post/picky-mode/
+    (setq languagetool-suggestion-level "PICKY")
+    ;; parámetro recomendado para asegurar el uso de UTF-8
+    (setq languagetool-java-arguments '("-Dfile.encoding=UTF-8")))
+#+end_src
+
+Debiera ser posible desactivar algunas reglas de LanguageTool a través de la variable ~languagetool-disabled-rules~, pero ella no está documentada. Si acaso esto fuese análogo a como se configura langtool.el, podemos adaptar el código que aparece [[http://web.archive.org/web/20190925063723/https://joelkuiper.eu/spellcheck_emacs][aquí]] para probar si funciona con languagetool.el.
+
+Si deseáramos corregir la ortografía de variables escritas de acuerdo a /camel case/ (ejemplo: aquellaQueSeEscribeAsí), podemos consultar [[http://blog.binchen.org/posts/what-s-the-best-spell-check-set-up-in-emacs/][este]] recurso.
+
+*** TODO Org-mode: procesador de textos en formato Org
+
+Notas:
+
+- Considerar desactivar =electric-indent-mode= como en mi configuración original (parece que ya está solucionado pues no puedo replicar [[https://www.philnewton.net/blog/electric-indent-with-org-mode/][esto]]).
+- Funciones especiales en los títulos y listas: [[https://orgmode.org/manual/Headlines.html][link]].
+- Speed keys: [[https://orgmode.org/manual/Speed-Keys.html][link]].
+- Código para desactivar la confirmación de Org babel: [[https://emacs.stackexchange.com/a/21128][link]].
+- Shortcuts para trabajar con imágenes:
+  - =C-c C-x C-v <-- mostrar/ocultar imágenes=
+  - =C-c C-x M-v <-- volver a cargar todas las imágenes=
+- Considerar eliminar la posibilidad de ejecutar código en Org (para R está RStudio y para Python está Jupyter)
+- Cronómetros (Org base)
+  - [[https://orgmode.org/manual/Clocking-commands.html][Clocking commands]] (documentación de Org mode)
+  - [[https://writequit.org/denver-emacs/presentations/2017-04-11-time-clocking-with-org.html][Clocking time with Org-mode]] (muy bueno)
+
+**** redactar
+
+- Qué tiempo se despliega en la modeline: org-clock-mode-line-total (notemos que esta variable solo aparece después de activar el reloj por primera vez)
+  - 'current: mostrar solo el tiempo actual
+  - 'today: el tiempo de todo el día (problemas a la medianoche)
+  - 'repeat: con respecto a la última vez que se trabajó en esta cosa repetitiva
+  - 'all: todo el tiempo
+  - 'auto: all o repeat, este último para tareas repetitivas
+- Para recorrer las posibilidades en un ciclo: [[https://mbork.pl/2019-05-11_Toggling_modeline_clock_display][link]]
+- Comandos:
+  - ~C-c C-x C-i~: comenzar
+  - ~C-c C-x C-o~: terminar
+  - ~C-c C-x C-q~: cancelar
+  - ~C-c C-x C-d~: reporte rápido
+- Sobre cronómetros que no se pierden al cerrar Emacs: [[https://writequit.org/denver-emacs/presentations/2017-04-11-time-clocking-with-org.html][link]] y [[https://emacsdocs.org/docs/org/Clocking-Work-Time][link]]
+- Sobre tabs y espacios para indentar: [[https://dougie.io/emacs/indentation/][link]]
+
+**** Funciones auxiliares
+
+***** Cambiar el valor de una propiedad (campo) de un documento Org
+
+#+name: org-change-property-value
+#+begin_src emacs-lisp
+  ;; - actualizar propiedad de documento Org
+  (defun dn/update-org-property (property-regex property-new-value)
+    " Replaces first match of property-regex value with property-new-value.
+  It only works in Org-mode."
+    (when (eq major-mode 'org-mode)
+      (save-excursion
+        (widen)
+        (goto-char (point-min))
+        (when (re-search-forward property-regex (point-max) t)
+          (progn
+            ;;(kill-line) guardaría la timestamp en el kill-ring
+  	  ;;(delete-region a b) no lo hace
+  	  ;; https://stackoverflow.com/a/21780995
+  	  ;; alt: https://unix.stackexchange.com/a/136581
+  	  (delete-region (point) (line-end-position))
+            (insert (concat " " property-new-value))
+            )))))
+#+end_src
+
+***** Actualizar el campo =LAST_MODIFIED= de los documentos Org
+
+#+name: org-update-property-last-modified
+#+begin_src emacs-lisp
+  (defun dn/update-org-last-modified ()
+    " Updates the value of LAST_MODIFIED with current timestamp."
+    (interactive)
+    ;; desactivamos undo de manera momentánea
+    ;; fuente: https://emacs.stackexchange.com/a/4222
+    (let (buffer-undo-list)
+      (dn/update-org-property "^#\\+LAST_MODIFIED:"
+  			    (format-time-string "%Y-%m-%dT%H:%M:%S%:z"))))
+#+end_src
+
+***** Eliminar enlace de Org conservando su descripción
+
+#+name: org-delete-link-keep-description
+#+begin_src emacs-lisp
+  ;; borrar enlace de documento Org
+  ;; fuente: https://emacs.stackexchange.com/a/10714
+  (defun afs/org-replace-link-by-link-description ()
+    "Replace an Org link by its description or, if empty, its address."
+    (interactive)
+    (if (org-in-regexp org-link-bracket-re 1)
+        (save-excursion
+          (let ((remove (list (match-beginning 0) (match-end 0)))
+                (description
+                 (if (match-end 2)
+                     (org-match-string-no-properties 2)
+                   (org-match-string-no-properties 1))))
+            (apply 'delete-region remove)
+            (insert description)))))
+#+end_src
+
+**** Configuración de Org
+
+#+name: org-mode-config
+#+begin_src emacs-lisp
+  ;; configuración de Org-mode
+  (use-package org
+    :defer t
+    :config
+    ;; go back to old (pre-Org 9.4) org-return behaviour (see Org 9.4 release notes)
+    ;;(add-hook 'org-mode-hook 'deactivate-electric-indent-local-mode)
+    ;; Org initial visibility: global settings
+    ;;   local +STARTUP alternatives:
+    ;;     'overview', 'content', 'showall', 'show2levels', . . ., 'show5levels', 'showeverything'
+    (setq org-startup-folded 'content)
+    ;; Org indent mode: global settings
+    ;;   local +STARTUP alternatives: 'indent' and 'noindent'
+    ;;   note that +STARTUP 'indent' leaves 'hidestars' redundant and has precedence over 'showstars'
+    (setq org-startup-indented t)
+    ;; always leave an empty line between collapsed headers
+    (setq org-cycle-separator-lines 1)
+    ;; activate speed commands on headers
+    ;; also: special shortcuts on headers and lists
+    ;; (note that all these work in Insert "mode" only)
+    (setq org-use-speed-commands t
+  	org-special-ctrl-a/e t
+  	org-special-ctrl-k t
+  	org-ctrl-k-protect-subtree 'error)
+    ;; use a curved arrow instead of 3 dots to signal an invisible region
+    (setq org-ellipsis " ⤵")
+    ;; don't underline the org-ellipsis character(s)
+    (set-face-attribute 'org-ellipsis nil :underline nil)
+    ;; deal with edits on invisible regions in a smart way
+    (setq org-catch-invisible-edits 'show-and-error)
+    ;; never hide the emphasis markers (for example, slashes for italics)
+    (setq org-hide-emphasis-markers nil)
+    ;; how to display LaTeX images (math)
+    ;; C-c C-x C-l (org-latex-preview) <-- show/hide equation next to point
+    ;; C-u C-c C-x C-l <-- show/hide equations in current section
+    ;; C-u C-u C-c C-x C-l <-- show/hide equations in the current document
+    (setq org-format-latex-options (plist-put org-format-latex-options :scale 1.8)
+  	org-format-latex-options (plist-put org-format-latex-options :foreground "Black")
+  	org-format-latex-options (plist-put org-format-latex-options :background "White")
+  	org-format-latex-options (plist-put org-format-latex-options :html-foreground "Black")
+  	org-format-latex-options (plist-put org-format-latex-options :html-background "Transparent")
+  	org-format-latex-options (plist-put org-format-latex-options :html-scale 1.0))
+    ;; bypass org-babel confirmation when evaluating the listed languages
+    (defun ryuslash/org-confirm-babel-evaluate (lang body)
+      (not (member lang '("R"))))
+    (setq org-confirm-babel-evaluate #'ryuslash/org-confirm-babel-evaluate)
+    ;; tell org-babel which languages it should be aware of
+    ;; nil para desactivar, t para activar
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '((R . nil)
+       (emacs-lisp . t)))
+    ;;  :bind
+    ;;  (:map org-mode-map
+    ;;        ("C-a" . org-beginning-of-line)
+    ;;        ("C-e" . org-end-of-line)
+    ;;        ("C-k" . org-kill-line))
+    ;;(put 'org-mode 'flyspell-mode-predicate 'org-mode-flyspell-verify)
+    ;; reloj de Org mode
+    (evil-define-key 'normal 'global (kbd "<leader>ci") 'org-clock-in)
+    (evil-define-key 'normal 'global (kbd "<leader>co") 'org-clock-out)
+    (evil-define-key 'normal 'global (kbd "<leader>cl") 'org-clock-in-last)
+    (evil-define-key 'normal 'global (kbd "<leader>cs") 'org-clock-display)
+    :hook
+    ;;(org-mode . flyspell-mode)
+    (before-save . dn/update-org-last-modified))
+#+end_src
+
+* Configuración base de Emacs
+
+En esta sección configuramos Emacs a través de las funcionalidades que este provee de forma nativa.
+
+** Relacionadas con el funcionamiento de Emacs
+
+*** Desactivar el mensaje de bienvenida de Emacs
+
+Al hacer esto, Emacs se iniciará desplegando el /buffer/ ~*scratch*~ en lugar del mensaje de bienvenida.
+
+#+name: bypass-startup-message
+#+begin_src emacs-lisp
+  (setq inhibit-startup-message t)
+#+end_src
+
+*** Forzar el uso de UTF-8 y de LF para denotar saltos de línea
+
+Existen distintas versiones sobre cómo configurar Emacs para que trabaje con UTF-8 de manera consistente. Una bien austera es la que [[https://github.com/doomemacs/doomemacs/blob/286be1b2496a3ffa2280a16a41f56babebea93f0/lisp/doom-start.el#L133][proponían]] los autores de Doom Emacs:
+
+#+name: doom-emacs-utf8-lf-config
+#+begin_src emacs-lisp
+  ;;; Encodings
+  ;; Contrary to what many Emacs users have in their configs, you don't need more
+  ;; than this to make UTF-8 the default coding system:
+  (set-language-environment 'utf-8)
+  ;; ...but `set-language-environment' also sets `default-input-method', which is
+  ;; a step too opinionated.
+  ;; (setq default-input-method nil)
+  ;; ...And the clipboard on Windows could be in a wider encoding (UTF-16), so
+  ;; leave Emacs to its own devices there.
+  ;;(eval-when! (not doom--system-windows-p)
+  ;;  (setq selection-coding-system 'utf-8))
+  (setq selection-coding-system 'utf-8)
+#+end_src
+
+En este caso no asignamos ~nil~ a ~default-input-method~, cosa que hasta el momento no ha provocado efectos adversos visibles. La otra diferencia con lo propuesto por los autores de Doom Emacs es que ejecutamos la asignación a ~selection-coding-system~ sin verificar acaso estamos trabajando en un sistema distinto a Windows.
+
+Otro detalle de codificación que puede traernos problemas si planeamos utilizar Emacs de forma nativa tanto en Linux como en Windows es qué carácter utilizar para representar los saltos de línea en los archivos de texto.
+
+Hablando gruesamente, existen dos alternativas para indicarle al computador la existencia de saltos de línea en un archivo de texto: la secuencia CR+LF y la LF.
+
+La primera de ellas es utilizada en la actualidad por Windows. La segunda, de manera simplificada, por todos los sistemas operativos derivados de UNIX, lo que incluye GNU/Linux y macOS.
+
+Daremos preferencia a la secuencia utilizada por Linux y la imponemos con el [[https://emacs.stackexchange.com/a/75782][siguiente código]]:
+
+#+name: stack-overflow-utf8-lf-config
+#+begin_src emacs-lisp
+  ;; Emacs en Windows puede comportarse distinto en cuanto a los saltos de línea
+  ;; buscamos que prefiera utf8 con LF de unix
+  ;; https://emacs.stackexchange.com/a/75782
+  (prefer-coding-system 'utf-8-unix)
+  ;;(setq coding-system-for-read 'utf-8-unix)
+  ;;(setq coding-system-for-write 'utf-8-unix)
+#+end_src
+
+Complementamos lo anterior con [[http://xahlee.info/emacs/emacs/emacs_file_encoding.html][estas últimas recomendaciones]]:
+
+#+name: xahlee-utf-8-lf-config
+#+begin_src emacs-lisp
+  ;; http://xahlee.info/emacs/emacs/emacs_file_encoding.html
+  ;; http://xahlee.info/emacs/emacs/emacs_encoding_decoding_faq.html
+  ;;(set-language-environment 'utf-8)
+  (set-default-coding-systems 'utf-8)
+  (set-keyboard-coding-system 'utf-8-unix)
+  ;; add this especially on Windows, else python might show output problems
+  (set-terminal-coding-system 'utf-8-unix)
+#+end_src
+
+Podemos leer más acerca de la codificación de archivos de texto plano [[http://xahlee.info/emacs/emacs/emacs_encoding_decoding_faq.html][aquí]]. Si planeamos trabajar solo en entornos Unix, es probable que baste nada más con incluir el código que aparece al comienzo de esta sección en nuestro ~init.el~.
+
+Independiente de la configuración anterior, le podemos indicar a Emacs que nuestros archivos Org utilizan la codificación UTF-8 de UNIX colocando la siguiente instrucción al comienzo de ellos:
+
+#+name: files-utf8-encoding
+#+begin_src emacs-lisp :tangle no
+  ;; -*- coding: utf-8-unix; -*-
+#+end_src
+
+*** Desactivar los mecanismos de protección contra la pérdida de información
+
+Emacs trata de minimizar la posibilidad de que perdamos información utilizando distintos métodos. Los más llamativos son los que crean archivos de respaldo con caracteres /gato/ (=#=) y /cola de chancho/ (=~=) en el directorio de trabajo. Esto puede ser molesto pues /ensucia/ nuestros directorios de trabajo con archivos temporales que en ocasiones tendremos que borrar manualmente.
+
+Podemos lidiar con esta molestia forzando a que Emacs almacene estos archivos temporales en un directorio distinto al de trabajo o bien desactivando estos mecanismos de protección. Un buen argumento a favor de lo segundo es evitar posibles fugas de información delicada, cosa que podría ocurrir si no se presta atención a la configuración de estos mecanismos.
+
+Desactivamos las medidas de protección con el siguiente [[https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L81][código descontinuado]] de Doom Emacs:
+
+#+name: forbid-autosave-and-others
+#+begin_src emacs-lisp
+  ;; desactivar el guardado automático de archivos
+  ;; quienes no acostumbren guardar su trabajo periódicamente preferirán
+  ;; no cambiar el valor de esta variable
+  (setq auto-save-default nil)
+
+  ;; desactivar la protección contra colisiones
+  ;; estos son los archivos con los caracteres ".#" en su nombre
+  (setq create-lockfiles nil)
+
+  ;; desactivar la creación de archivos de respaldo
+  ;; estos son los archivos con caracter "~" al final de su nombre
+  (setq make-backup-files nil)
+#+end_src
+
+Notemos que la [[https://github.com/doomemacs/doomemacs/blob/a6df88a56a3fccf483ee992dc4801f5d9a1983c4/lisp/doom-editor.el#L110][recomendación a la fecha de redacción]] de los mantenedores de Doom Emacs es desactivar los =lockfiles= y los =backup-files= y configurar =auto-save=.
+
+*** Fijar el directorio de inicio por omisión
+
+El siguiente código nos permite definir el directorio en donde se iniciará el "explorador de archivos" de Emacs:
+
+#+name: config-starting-folder
+#+begin_src emacs-lisp
+  ;; configurar el directorio de inicio
+  ;;   función auxiliar para subir en la jerarquía de directorios
+  (defun cb/parent-directory (dir)
+    " Ruta al directorio padre de `dir'.
+  Fuente: https://stackoverflow.com/a/14096693"
+    (unless (equal "/" dir)
+      (file-name-directory (directory-file-name dir))))
+  ;;   asignación de `dn/my-home' dependiendo del sistema operativo anfitrión
+  (if ON-WINDOWS
+      (setq dn/my-home (cb/parent-directory (cb/parent-directory (getenv "HOME"))))
+    (setq dn/my-home (file-name-as-directory (getenv "HOME"))))
+  ;;   asignación del directorio de inicio (si no existe, lo creamos)
+  (let ((temp-dir (expand-file-name
+  		 (file-name-as-directory dn/starting-folder)
+  		 (file-name-as-directory dn/my-home))))
+    (unless (file-directory-p temp-dir)
+      (make-directory temp-dir))
+    (setq default-directory temp-dir))
+#+end_src
+
+Especificaremos el directorio de nuestro /home/ donde queremos comenzar con la variable =dn/starting-folder=.
+
+*** Configurar el archivo creado con el asistente de configuración
+
+Podemos configurar Emacs de manera /programática/ o asistida. Cuando ocupamos esta segunda opción, Emacs [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Saving-Customizations.html][almacenará por omisión]] las instrucciones en el archivo =init.el=.
+
+Utilizamos el [[https://old.reddit.com/r/emacs/comments/9rrhy8/emacsers_with_beautiful_initel_files_what_about/e8j58jb/][código siguiente]] para indicarle a Emacs que utilice el archivo =custom.el= para almacenar dichas configuraciones:
+
+#+name: custom-config-file
+#+begin_src emacs-lisp
+  ;; fijamos el archivo secundario de configuraciones y, si existe, lo cargamos
+  (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+  (when (file-exists-p custom-file)
+    (load custom-file))
+#+end_src
+
+Hacemos esto como medida preventiva: en caso de utilizar el asistente de configuración, las instrucciones que este cree no contaminarán nuestro archivo ~init.el~.
 
 *** Desactivar la campana
 
-Desactivamos la retroalimentación visual de la campana y su sonido pues es molesto y no presta ninguna utilidad con [[https://github.com/hlissner/doom-emacs/blob/c94ea8e4b1e3b2bfd3911ca4f95a110e0964cad7/core/core-ui.el#L168][el siguiente código]]:
+Desactivamos el sonido de la campana y el eventual destello de la ventana asociado con esta notificación con el [[https://github.com/doomemacs/doomemacs/blob/286be1b2496a3ffa2280a16a41f56babebea93f0/lisp/doom-ui.el#L150][siguiente código]]:
 
-#+BEGIN_SRC emacs-lisp
-  ;; disable the bell ring and the visual aid
-
+#+name: deactivate-bell
+#+begin_src emacs-lisp
+  ;; desactivar la campana
   (setq ring-bell-function #'ignore
         visible-bell nil)
-#+END_SRC
+#+end_src
 
-*** Desactivar el guardado automático de archivos y la protección contra colisiones de edición
+** Experiencia de usuario
 
-Si tenemos la buena costumbre de guardar nuestro trabajo constantemente, podemos desactivar la función de autoguardado de Emacs con la siguiente instrucción:
+*** Activar el ajuste de línea
 
-#+BEGIN_SRC emacs-lisp
-  ;; I'm in charge with saving my work, so don't autosave, please
+Activamos este recurso solo en los archivos de texto.
 
-  (setq auto-save-default nil)
-#+END_SRC
+#+name: text-files-word-wrap
+#+begin_src emacs-lisp
+  ;; activar el ajuste de línea en buffers de texto
+  (add-hook 'text-mode-hook #'turn-on-visual-line-mode)
+#+end_src
 
-Si, además, no estamos compartiendo nuestros archivos, el peligro de colisiones de edición es nulo, por lo que también podemos desactivar esa opción. Lo hacemos de la siguiente forma:
+*** Desactivar el centrado de la pantalla cuando el cursor atraviesa los límites del /buffer/
 
-#+BEGIN_SRC emacs-lisp
-  ;; if there's no chance that 2+ people edit the same
-  ;; file at the same time with Emacs, there's no point
-  ;; in having this option active, so we set it with nil
+Nos apoyamos en el código que [[https://github.com/doomemacs/doomemacs/blob/c94ea8e4b1e3b2bfd3911ca4f95a110e0964cad7/core/core-ui.el#L181][utilizaban]] los autores de Doom Emacs hace un tiempo (el código [[https://github.com/doomemacs/doomemacs/blob/a6df88a56a3fccf483ee992dc4801f5d9a1983c4/lisp/doom-ui.el#L162][actual]] a la fecha de redacción no es muy distinto):
 
-  (setq create-lockfiles nil)
-#+END_SRC
-
-Finalmente, para evitar que Emacs cree una [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Backup.html][copia de respaldo de cada archivo que visitamos]], ejecutamos el siguiente código:
-
-#+BEGIN_SRC emacs-lisp
-  ;; don't backup visited files
-
-  (setq make-backup-files nil)
-#+END_SRC
-
-Las configuraciones aquí establecidas nos evitan la creación de archivos temporales que podrían desordenar nuestros directorios o filtrar información sensible. Con esto, solo nosotros estamos a cargo de mantener la integridad de nuestros archivos.
-
-Más información:
-
-- Configuración de ~core.el~ en [[https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L81][Doom Emacs]].
-- Ergoemacs: [[http://ergoemacs.org/emacs/emacs_auto_save.html][Auto Save]].
-
-*** Desplazamiento por la pantalla (/scrolling/)
-
-Con [[https://github.com/hlissner/doom-emacs/blob/c94ea8e4b1e3b2bfd3911ca4f95a110e0964cad7/core/core-ui.el#L181][el siguiente código]] impedimos que Emacs centre la pantalla cuando cruzamos sus límites superior e inferior:
-
-#+BEGIN_SRC emacs-lisp
-  ;;; Scrolling
-
+#+name: deactivate-autoscroll
+#+begin_src emacs-lisp
+  ;; desactivar el centrado automático de la pantalla
   (setq hscroll-margin 2
         hscroll-step 1
         ;; Emacs spends too much effort recentering the screen if you scroll the
         ;; cursor more than N lines past window edges (where N is the settings of
         ;; `scroll-conservatively'). This is especially slow in larger files
         ;; during large-scale scrolling commands. If kept over 100, the window is
-        ;; never automatically recentered.
-        scroll-conservatively 101
+        ;; never automatically recentered. The default (0) triggers this too
+        ;; aggressively. Setting it to 10 will trigger recenter if scrolling too far
+        ;; off-screen.
+        scroll-conservatively 10
         scroll-margin 0
         scroll-preserve-screen-position t
         ;; Reduce cursor lag by a tiny bit by not auto-adjusting `window-vscroll'
@@ -440,75 +1424,209 @@ Con [[https://github.com/hlissner/doom-emacs/blob/c94ea8e4b1e3b2bfd3911ca4f95a11
         ;; mouse
         mouse-wheel-scroll-amount '(5 ((shift) . 2))
         mouse-wheel-progressive-speed nil)  ; don't accelerate scrolling
-#+END_SRC
+#+end_src
 
-*** Tamaño del cursor
+*** Recordar el historial de estados de las ventanas
 
-Para lograr que el tamaño del cursor no dependa del caracter sobre el que está posicionado, sino que sea constante, utilizamos [[https://github.com/hlissner/doom-emacs/blob/c94ea8e4b1e3b2bfd3911ca4f95a110e0964cad7/core/core-ui.el#L215][el siguiente código]]:
+Existen algunos comandos muy útiles de Emacs (como los de ayuda) que al ser invocados abrirán ventanas al interior del /frame/ para mostrar información.
 
-#+BEGIN_SRC emacs-lisp
-  ;; Don't stretch the cursor to fit wide characters, it is disorienting,
-  ;; especially for tabs.
+Recuperar la disposición previa de las ventanas podría tomarnos unas cuantas combinaciones de teclas que dependerán del contexto.
 
-  (setq x-stretch-cursor nil)
-#+END_SRC
+Podemos utilizar =winner-mode= para simplificar la administración de los distintos estados de las ventanas al interior del /frame/.
 
-*** Retroalimentación sobre la secuencia de comandos que el usuario está ingresando
+Al activar este modo podremos navegar entre el historial de estados utilizando siempre la misma combinación de teclas, sin importar el contexto. Esto se traduce en que siempre podremos deshacer y rehacer un cambio (movernos en el historial de estados) con =C-c ←= y =C-c →=.
 
-Utilizamos [[https://github.com/hlissner/doom-emacs/blob/c94ea8e4b1e3b2bfd3911ca4f95a110e0964cad7/core/core-ui.el#L338][el siguiente código]] para disminuir el tiempo (de 1 a 0.4 segundos) que Emacs espera para indicarnos la secuencia de comandos que estamos ingresando:
+#+name: winner-mode-config
+#+begin_src emacs-lisp
+  ;; activar winner-mode
+  (winner-mode 1)
+#+end_src
 
-#+BEGIN_SRC emacs-lisp
-  ;; Show current key-sequence in minibuffer ala 'set showcmd' in vim. Any
-  ;; feedback after typing is better UX than no feedback at all.
+*** Cortar texto solo cuando esté seleccionado de manera visible
 
-  (setq echo-keystrokes 0.4)
-#+END_SRC
+Cuando uno utiliza Emacs sin la emulación de edición modal que nos provee Evil, debe presionar =C-w= para cortar texto. Esto operará, por omisión, cortando el texto que se encuentre entre la posición actual del cursor y la última /marca/ que hayamos registrado (podemos leer qué es una marca en el contexto de Emacs consultando [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Mark.html][el manual]]).
 
-*** Respuestas a preguntas del tipo sí o no
+Este comportamiento confundirá a más de algún usuario. Podemos configurar Emacs para que, al presionar =C-w=, solo corte el texto que esté seleccionado de manera visible en la pantalla con el siguiente [[https://www.reddit.com/r/emacs/comments/amm03u/comment/efncv2x/][código]]:
 
-Podemos ahorrarnos algunos milisegundos al responder preguntas del tipo sí o no utilizando la [[https://github.com/hlissner/doom-emacs/blob/c94ea8e4b1e3b2bfd3911ca4f95a110e0964cad7/core/core-ui.el#L348][siguiente instrucción]]:
+#+name: kill-highlighted-regions-only
+#+begin_src emacs-lisp
+  ;; don't kill a region with C-w unless it is highlighted
+  (defun nerfed-kill ()
+    (interactive)
+    (if (use-region-p)
+        (kill-region (region-begin) (region-end))))
+  (global-set-key (kbd "C-w") 'nerfed-kill)
+#+end_src
 
-#+BEGIN_SRC emacs-lisp
-  ;; Save keystrokes when answering yes or no questions
+*** Comportamiento de la tecla =ALT= en macOS
 
-  (advice-add #'yes-or-no-p :override #'y-or-n-p)
-#+END_SRC
+Emacs interpreta las dos teclas =ALT= como /meta/ en macOS. Esto es un problema para quienes dependemos de =ALT= para introducir caracteres que no existen en el idioma inglés.
 
-*** División de la pantalla
+Podemos "liberar" la tecla =ALT= derecha en macOS para que no sea interpretada como /meta/ con el siguiente código:
 
-Algunos comandos de Emacs (como los de ayuda) dividen la pantalla para mostrarnos cierto tipo de información. Podemos forzar que esta división sea tal que los /buffers/ queden uno arriba de otro con [[https://stackoverflow.com/questions/2081577/setting-emacs-to-split-buffers-side-by-side#comment2013183_2081978][la siguiente instrucción]]:
+#+name: unbind-right-alt-key
+#+begin_src emacs-lisp
+  ;; unbind right-ALT from Emacs
+  (when ON-MAC
+    (setq ns-right-alternate-modifier 'none))
+#+end_src
 
-#+BEGIN_SRC emacs-lisp
-  ;; when dividing the screen put windows on top of each other
+*** Ocultar la barra de herramientas de la GUI
 
-  (setq split-width-threshold nil)
-#+END_SRC
+Como la barra de herramientas de la GUI no presta ninguna utilidad, podemos ocultarla.
 
-Si quisiéramos forzar el comportamiento complementario, podemos utilizar [[https://github.com/hlissner/doom-emacs/blob/c94ea8e4b1e3b2bfd3911ca4f95a110e0964cad7/core/core-ui.el#L326][esta instrucción]].
+#+name: hide-tool-bar
+#+begin_src emacs-lisp
+  ;; ocultar la barra de herramientas de la GUI
+  (tool-bar-mode -1)
+#+end_src
 
-*** Tiempo de refresco de algunos de los elementos de la interfaz
+*** Aumentar o disminuir el tamaño de las letras ("/zoom/")
 
-Seguimos el [[https://github.com/hlissner/doom-emacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L208][consejo del autor de Doom Emacs]] aumentando el tiempo de refresco de 0.5 a 1 segundo:
+Inspirados en [[https://github.com/bbatsov/prelude/blob/7b1270848353c95e79079447d790fabb6da71210/core/prelude-global-keybindings.el#L36][este código]], podemos asignar atajos de teclado a las funciones de aumento (~text-scale-increase~) y reducción (~text-scale-decrease~) del tamaño de letra en el /buffer/ actual de la siguiente forma:
 
-#+BEGIN_SRC emacs-lisp
-  ;; Emacs "updates" its ui more often than it needs to, so we slow it down
-  ;; slightly from 0.5s:
+#+begin_src emacs-lisp
+  ;; zoom in/out text with the keyboard
+  (if ON-MAC
+      (progn
+        (global-set-key (kbd "s-+") 'text-scale-increase)
+        (global-set-key (kbd "s--") 'text-scale-decrease))
+    (global-set-key (kbd "C-+") 'text-scale-increase)
+    (global-set-key (kbd "C--") 'text-scale-decrease))
+#+end_src
 
-  (setq idle-update-delay 1.0)
-#+END_SRC
+Diferenciamos entre macOS y otros sistemas operativos para mantener la consistencia en cada uno de ellos: en macOS, lo habitual es que las funciones de /zoom in/ y /out/ estén asociadas a la tecla =cmd= (=s= en el código), mientras que los demás sistemas operativos suelen utilizar la tecla =CTRL= para el mismo fin.
 
-*** Ajuste del tipo de letra en la GUI
+*** Activación del tema de acuerdo a si accedemos a Emacs a través de su GUI o no
 
-Configurar el tipo de letra que deseamos que el cliente gráfico de Emacs utilice siempre, independiente de si fue iniciado desde el menú de aplicaciones o desde una terminal a través de un /daemon/, exige cierta creatividad. Dicha creatividad fue la que puso en práctica el usuario [[http://web.archive.org/web/20201011233955/https://old.reddit.com/r/emacs/comments/8fyzjd/theme_not_loading_completly_with_emacsserver/dy8cd0a/][iNox_ de Reddit]] en [[http://web.archive.org/web/20201011234137/https://gist.github.com/weirdNox/80ac2707b776d18d5517adaaa1dda901][este código]], el que reproduzco a continuación con algunos cambios mínimos:
+Cargamos ~Leuven~ cuando iniciamos Emacs con su GUI y ~doom-city-lights~ cuando lo hacemos en la terminal.
 
-#+BEGIN_SRC emacs-lisp
+#+name: activate-theme-config
+#+begin_src emacs-lisp
+  ;; (defun dn/load-theme-cond ()
+  ;;   "Carga un tema claro u oscuro dependiendo de si estamos ejecutando
+  ;; Emacs con la GUI o en una terminal."
+  (if (display-graphic-p)
+      (load-theme 'leuven t)
+    (progn
+      (load-theme 'doom-city-lights t)
+      (solaire-global-mode +1)))
+
+  ;; (add-hook 'after-make-frame-functions #'dn/load-theme-cond)
+#+end_src
+
+*** TODO Ajustar la fuente a utilizar en el editor
+
+La GUI de Emacs nos da la libertad de utilizar múltiples tipografías en un mismo /buffer/, cuestión imposible cuando ejecutamos el programa en la terminal. Esto último se debe a que todos los programas que se ejecutan en una terminal solo pueden utilizar una tipografía, que es la configurada en ella.
+
+Presentamos a continuación dos configuraciones: una en la que iniciamos una nueva instancia de Emacs cada vez que iniciamos la aplicación y otra para cuando ejecutamos Emacs en modo cliente y servidor a través de un ~daemon~, de modo que todos los clientes que utilicemos se conectarán y dependerán de un /servidor/.
+
+Dado que, a la fecha de redacción, el ~daemon~ de Emacs bajo la WSLg de Windows 10 parece adolecer de algunos /bugs/ y que, en la práctica, solo estaremos trabajando con una instancia de Emacs de forma local, activaremos solo la primera configuración en nuestro ~init.el~.
+
+Notemos, además, que es necesario configurar las fuentes en ~init.el~ y no en ~early-init.el~. Lo segundo podría aparecer como una alternativa ideal cuando ejecutamos Emacs en modo ~daemon~: como existen algunas limitaciones prácticas al trabajar con el ~daemon~ de Emacs que dejan la configuración de la primera ventana de la GUI que abramos algo huérfana, almacenar nuestra configuración de tipografías en ~early-init.el~ asoma como una buena solución. El problema es que ese archivo se ejecuta antes de cargar los componentes de la GUI, estado en el que Emacs se comporta como si estuviera siendo ejecutado en una terminal, de modo que no tendremos acceso a las tipografías del sistema y nuestra configuración de tipografías no tendrá efecto.
+
+Finalmente, debemos también considerar la posibilidad de que nuestras fuentes preferidas no estén presentes en el sistema anfitrión, en cuyo caso no debemos configurar nada.
+
+**** TODO Al utilizar una instancia de Emacs por cada cliente
+
+- [ ] Explorar acaso este es el código que disminuye el rendimiento de Emacs con el paso del tiempo (el profiler daba cuenta de que font-lock-fontify-region, derivado de jit-lock-function, estaba gastando muchos recursos)
+- [ ] Verificar acaso las cosas se arreglan evitando que Emacs comprima las fuentes en memoria (una de las soluciones recomendadas por la gente)
+- [ ] Investigar [[https://www.reddit.com/r/emacs/comments/1azrmul/help_with_emacs_performance_fontlockmode/][estas]] recomendaciones y comentarios (verificar que no estamos ejecutando ningún paquete de Doom) y [[https://www.reddit.com/r/emacs/comments/1bwe92d/incredibly_slow_when_navigating_through_file/][este]] otro hilo de Reddit con información comlementaria
+- [ ] Probar esta configuración en una distribución diferente a openSUSE
+- [ ] Considerar la posibilidad de que este sea un problema del kernel de WSL, el que al momento de la redacción tiene problemas de estabilidad entre hibernaciones de Windows
+- [ ] Funciones alternativas: [[https://emacs.stackexchange.com/a/3044][link]]
+
+La estrategia es la siguiente:
+
+- Verificar que el sistema anfitrión cuenta con alguna de las fuentes que deseamos:
+  - ~dn/org-text-fonts~: fuentes para el texto.
+  - ~dn/org-block-fonts~: fuentes para toda la interfaz de Emacs y los bloques de Org.
+- Configuramos la primera fuente de la ~alist~ ~dn/available-org-block-fonts~ como aquella predeterminada para toda la interfaz de Emacs.
+- Luego asignamos el primer elemento de ~dn/available-org-text-fonts~ a todos los modos de texto. Como consecuencia de esto, todos los bloques de Org adoptarán esa misma fuente.
+- Nos aseguramos de que los bloques de Org utilicen ~dn/available-org-block-fonts~ volviendo a configurarla.
+
+#+name: configurar-fuente
+#+begin_src emacs-lisp
+  ;; configurar las fuentes
+  ;; configuramos una fuente para todo Emacs y luego configuramos los buffers
+  ;; de texto de manera particular
+
+  ;; enfoques:
+  ;;   https://www.reddit.com/r/emacs/comments/111bsc9/comment/j8eukes/
+  ;;   https://emacs.stackexchange.com/a/3044
+  ;;   https://zzamboni.org/post/beautifying-org-mode-in-emacs/
+
+  (defvar dn/org-text-fonts '(("JetBrains Mono" . 12)  ;; multiplataforma
+  			    ("Roboto Mono" . 12) ;; multiplataforma
+  			    ("Menlo" . 18)  ;; exclusiva de macOS
+  			    ("Consolas" . 16)  ;; exclusiva de Windows
+  			    ("DejaVu Sans Mono" . 12))  ;; usualmente disponible en Linux
+    "Tipografías deseadas y su tamaño en puntos en orden de preferencia.")
+
+  (defvar dn/org-block-fonts '(("Iosevka Fixed" . 13)  ;; multiplataforma
+    			     ("Fira Code" . 12))  ;; multiplataforma
+    "Tipografías monoespaciadas deseadas y su tamaño en puntos en orden de preferencia.")
+
+  (defun font-available-p (font-name)
+    ;; fuente:
+    ;;   https://emacsredux.com/blog/2021/12/22/check-if-a-font-is-available-with-emacs-lisp/
+    (find-font (font-spec :name font-name)))
+
+  (defun dn/check-available-fonts (font-alist)
+    "Verifica qué fuentes están disponibles en la plataforma anfitriona.
+    Devuelve aquellas existentes en orden de preferencia."
+    (let (available-fonts)
+      (dolist (font font-alist)
+        (when (font-available-p (car font))
+          (push font available-fonts)))
+      (nreverse available-fonts)))
+
+  (setq dn/available-org-text-fonts (dn/check-available-fonts dn/org-text-fonts))
+  (setq dn/available-org-block-fonts (dn/check-available-fonts dn/org-block-fonts))
+
+  (unless (eq dn/available-org-block-fonts nil)
+
+    ;; (setq my-org-block-font-spec (format "%s-%d"
+    ;; (caar dn/available-org-block-fonts)
+    ;; (cdar dn/available-org-block-fonts)))
+
+    (set-face-attribute 'default nil
+  		      :family (caar dn/available-org-block-fonts)
+  		      :height (* 10 (cdar dn/available-org-block-fonts)))
+    )
+
+
+  ;; (setq my-org-text-font-spec (format "%s-%d"
+  ;; (caar dn/available-org-text-fonts)
+  ;; (cdar dn/available-org-text-fonts)))
+
+  (defun dn/set-org-faces ()
+    "Configurar la tipografía para Org."
+    (with-eval-after-load 'org-faces
+      (unless (eq dn/available-org-text-fonts nil)
+        (face-remap-add-relative 'default
+  			       :family (caar dn/available-org-text-fonts)
+  			       :height (* 10 (cdar dn/available-org-text-fonts))))
+      (unless (eq dn/available-org-block-fonts nil)
+        (set-face-attribute 'org-block nil
+  			  :family (caar dn/available-org-block-fonts)
+  			  :height (* 10 (cdar dn/available-org-block-fonts))))
+      ))
+
+  (add-hook 'text-mode-hook #'dn/set-org-faces)
+#+end_src
+
+**** Al utilizar una instancia de Emacs para todos los clientes: modo ~daemon~
+
+Podemos configurar la fuente que Emacs utilizará independiente de si es invocado desde el menú de aplicaciones o desde la línea de comandos en modo de /daemon/ adaptando un [[http://web.archive.org/web/20201011234137/https://gist.github.com/weirdNox/80ac2707b776d18d5517adaaa1dda901][código]] compartido por el usuario [[http://web.archive.org/web/20201011233955/https://old.reddit.com/r/emacs/comments/8fyzjd/theme_not_loading_completly_with_emacsserver/dy8cd0a/][iNox]] de Reddit:
+
+#+name: font-config
+#+begin_src emacs-lisp :tangle no
   ;; set font: working solution for emacsclient and emacs instances
-
-  (defvar nox/fonts '(("Menlo" . 18)
-                      ("DejaVu Sans Mono" . 12)
-                      ("Hack" . 11)
-                      ("Inconsolata" . 13)
-                      ("Source Code Pro" . 11))
+  (defvar nox/fonts '(("Menlo" . 18)  ;; macOS
+                      ("Consolas" . 16)  ;; Windows
+                      ("DejaVu Sans Mono" . 12)  ;; Linux
+                      ("Roboto Mono" . 12)) ;; otro
     "List of fonts and sizes. The first one available will be used.")
 
   (defun nox/change-font ()
@@ -552,1048 +1670,23 @@ Configurar el tipo de letra que deseamos que el cliente gráfico de Emacs utilic
       (add-hook 'after-make-frame-functions 'nox/setup-font)
     (if (display-graphic-p)
         (nox/setup-font (car (frame-list)))))
-#+END_SRC
+#+end_src
 
-Comentemos el código. En la variable =nox/fonts= especificamos (en orden de preferencia de mayor a menor) las fuentes que más nos gustaría que Emacs utilizara. 
+Notemos que, en sistemas donde las variedades de una misma fuente (normal, itálica y negrita como las fundamentales) estén almacenadas en archivos distintos, este código solo será capaz de configurar las variantes normal y negrita cuando estemos trabajando con la GUI de WSL 2 (Windows Subsystem for Linux).
 
-La función =nox/change-font= se ocupará de mirar, por un lado, las fuentes listadas al interior de =nox/fonts= y, por el otro, la lista de fuentes instaladas en el sistema. La primera fuente de la lista =nox/fonts= que esté instalada en el computador será configurada como predeterminada. Esto lo hace con la función =set-frame-font= y con la variable =default-frame-alist= a la vez.
+* TODO Otras configuraciones
 
-En el caso de la función =nox/setup-font=, su única responsabilidad es ejecutar =nox/change-font= con una ventana (/frame/) como argumento.
+** Insertar fecha y hora actual
 
-Finalmente, todo se hila con una simple pregunta: ¿está siendo Emacs ejecutado como servidor (=if (daemonp)=)? Si es así, le pedimos a Emacs que ejecute =nox/setup-font= luego de cada vez que cree una ventana (/frame/). Si no, ejecutamos =nox/setup-font= en el frame actual.
+Insertamos la fecha y hora actual según la ISO 8601 con T como separador y sin especificar microsegundos en el lugar donde se encuentra el cursor con la siguiente función:
 
-Hay un aspecto nada más de la lógica del programa que me intriga: la posición del condicional =(if (not available-fonts) ...)= en relación al uso de =nox/change-font= en modo “interactivo”. Mis reparos para cuando se invoca interactivamente (o sea, [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Using-Interactive.html][con =M-x= o un atajo de teclado]]):
-
-- Lo primero que hace la función =nox/change-font= es revisar el contenido de =nox/fonts= (independiente de si se llamó interactivamente o no).
-- Si se diera el caso de que ninguna de las fuentes de la lista estuviera instalada en el computador, la función desplegaría un error y terminaría.
-  - El usuario no alcanza a ser consultado aquí por la fuente que desea configurar. Luego, que =nox/change-font= termine su ejecución desplegando un mensaje de error que dice “ninguna de las fuentes seleccionadas está disponible” es muy confuso.
-- Solo en el caso en que al menos una de las fuentes de la lista esté instalada se le llega a preguntar al usuario por su preferencia.
-  - Y en este caso, si entiendo bien, solo se le da a escoger entre las fuentes de la lista que sí están instaladas. Este comportamiento puede ser el deseado, pero en la práctica yo prefiero el siguiente:
-    1. Preguntar al usuario por la fuente que desea utilizar, cualquiera, sugiriendo las de la lista.
-    2. Buscar si es que la fuente deseada está instalada.
-    3. Si está instalada, activarla.
-    4. Si no está instalada, darle al usuario la opción de cancelar o de volver al punto 1.
-
-Ahora, independiente de las dudas que me pueda generar, la práctica nos asegura que la función cumple plenamente su objetivo.
-
-*** Mostrar la ruta al archivo activo en la barra superior de la ventana
-
-Como el nombre del archivo activo usualmente ya aparece en la parte inferior del /buffer/, que aparezca también en la barra de título de la ventana (GUI de Emacs) resulta redundante. Podemos modificar este comportamiento ligeramente para que aparezca la ruta completa de acceso al archivo con [[https://emacsredux.com/blog/2013/04/07/display-visited-files-path-in-the-frame-title/][las siguientes instrucciones]]:
-
-#+BEGIN_SRC emacs-lisp
-  ;; show file path in the frame title (top bar in GUI)
-
-  (setq frame-title-format '((:eval (if (buffer-file-name)
-                                        (abbreviate-file-name (buffer-file-name))
-                                      "%b"))))
-#+END_SRC
-
-Si también quisiéramos destacar aquel estado en que los cambios introducidos a un archivo aún no han sido guardados, podemos utilizar las instrucciones que se encuentran [[https://stackoverflow.com/a/33135833][aquí]]. En mi opinión, esto no es necesario pues dicha información aparece usualmente en la parte baja del /buffer/.
-
-*** =which-key= · Sugerir atajos de teclado
-
-Para los casos en que no recordemos bien un atajo de teclado y necesitemos ayuda, podemos utilizar [[https://github.com/justbur/emacs-which-key][el paquete =which-key=]]. Este nos sugiere alternativas para completar los atajos mientras los estamos ingresando. Lo podemos activar de la siguiente manera:
-
-#+BEGIN_SRC emacs-lisp
-  ;; show all the completions available for an entered command prefix
-
-  (use-package which-key
-    :config
-    (which-key-mode 1))
-#+END_SRC
-
-En la [[https://github.com/justbur/emacs-which-key#initial-setup][documentación del paquete]] se pueden ver los aspectos que se pueden configurar.
-
-*** Administración de las ventanas
-
-Podemos utilizar ~winner-mode~ para restaurar la configuración de nuestras ventanas al interior de Emacs. Activamos este modo [[https://www.emacswiki.org/emacs/WinnerMode][de la siguiente forma]]:
-
-#+BEGIN_SRC emacs-lisp
-  ;; winner-mode: restore window configurations
-
-  (when (fboundp 'winner-mode)
-    (winner-mode 1))
-#+END_SRC
-
-Ahora podemos utilizar ~C-c ←~ y ~C-c →~ para movernos a través del historial de los estados.
-
-[[https://irreal.org/blog/?p=1557][Más información]].
-
-** Experiencia de usuario al editar archivos
-
-*** Comportamiento de la tecla derecha ~ALT~ en macOS
-
-En macOS, las teclas =ALT= son interpretadas como /meta/ por Emacs. Esto es problemático pues la tecla /meta/ es de gran importancia para Emacs (está asociada a todos los comandos del tipo ~M-~, además de cumplir también distintas funciones de acuerdo al contexto donde la presionamos) y a la vez también es muy importante para quienes contamos con teclados en español pues nos permite introducir multitud de caracteres útiles (como los paréntesis cuadrados y las llaves).
-
-Afortunadamente, disponemos de dos teclas =ALT= en el teclado, por lo que podemos alcanzar un compromiso satisfactorio: destinamos la tecla =ALT= de la izquierda a las funciones /meta/ y la de la derecha a las funciones mecanográficas con el siguiente código:
-
-#+BEGIN_SRC emacs-lisp
-  ;; unbind right-ALT from Emacs
-
-  (when IS-MAC
-    (setq ns-right-alternate-modifier 'none))
-#+END_SRC
-
-*** Borrar (cortar) desde la posición del cursor hasta el comienzo de la línea
-
-En ocasiones deseamos borrar desde la posición del cursor hasta el comienzo de la línea. Asociamos este comportamiento a la combinación =C-<backspace>= (=control= y =borrar=) con [[https://github.com/bbatsov/prelude/blob/dd9b01a991c9599842ba88e52fe6ae8627f4a782/core/prelude-global-keybindings.el#L82][el siguiente código]]:
-
-#+BEGIN_SRC emacs-lisp
-  ;; kill from point (the cursor) to the left with C-<backspace>
-
-  (global-set-key (kbd "C-<backspace>") (lambda ()
-                                          (interactive)
-                                          (kill-line 0)))
-#+END_SRC
-
-*** Solo cortar el texto que está seleccionado en la pantalla
-
-Existen distintos comandos de Emacs que actúan sobre regiones invisibles del /buffer/, [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Mark.html][delimitadas por una /marca/ y la posición del cursor]]. Quienes no estamos muy interiorizados sobre los comandos que dejan /marcas/ en un /buffer/ y que solamos equivocarnos al introducir atajos de teclado, podríamos sufrir con ~C-w~ (equivalente a ~s-x~ en macOS y ~C-x~ en los demás sistemas operativos). Este atajo está asociado a la función ~(kill-region)~, la que corta todo el texto que se encuentre entre la última /marca/ registrada por Emacs y el cursor.
-
-Para modificar el comportamiento de ~C-w~ de forma que solo corte un texto cuando exista un región seleccionada visible en pantalla, podemos utilizar el [[https://www.reddit.com/r/emacs/comments/amm03u/any_way_to_modify_cw_killregion_to_kill_only/efncv2x/][siguiente código]]:
-
-#+BEGIN_SRC emacs-lisp
-  ;; don't kill a region with C-w unless it is highlighted
-
-  (defun nerfed-kill ()
-    (interactive)
-    (if (use-region-p)
-        (kill-region (region-begin) (region-end))))
-  (global-set-key (kbd "C-w") 'nerfed-kill)
-#+END_SRC
-
-*** Reemplazar el texto seleccionado
-
-Es habitual en los procesadores de texto que, cuando uno selecciona una secuencia de palabras que aparecen en la pantalla y presiona una tecla, el carácter ingresado sobreescriba toda la región seleccionada. Esto no ocurre en Emacs.
-
-Para poder replicar este comportamiento en Emacs ejecutamos la siguiente instrucción:
-
-#+BEGIN_SRC emacs-lisp
-  ;; allow to overwrite selection
-
-  (delete-selection-mode t)
-#+END_SRC
-
-Aquí planteamos el problema en términos de edición de textos, pero naturalmente también aplica al ámbito de la programación.
-
-*** Ajuste visual del largo de las líneas (/line wrap/)
-
-Por omisión, Emacs permite que las líneas de texto escapen por la derecha de la pantalla. Este comportamiento podría ser deseable en archivos de código fuente, pero entorpece la edición de archivos de texto, ámbito en el que los párrafos podrían extenderse. Podemos activar el ajuste automático de líneas en estos últimos con [[https://old.reddit.com/r/emacs/comments/43vfl1/enable_wordwrap_in_orgmode/][la siguiente instrucción]]:
-
-#+BEGIN_SRC emacs-lisp
-  ;; line-wrap in all text files
-
-  (add-hook 'text-mode-hook #'turn-on-visual-line-mode)
-#+END_SRC
-
-Dependiendo de cómo tengamos configurada nuestra /modeline/, la instrucción anterior podría modificar la información que aparece desplegada en ella, indicándonos si el ajuste de línea está activado en el archivo que tenemos abierto o no. Esta información es innecesaria (podemos deducirla de un golpe de vista al archivo), por lo que si tenemos este problema, podemos reemplazar la instrucción anterior por el siguiente código (notemos que debemos instalar el paquete [[https://github.com/myrjola/diminish.el][=diminish.el=]] para que ella funcione):
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; line-wrap with consideration for the modeline
-
-  (defun my-helper-fun-line-wrap ()
-    "Helper function to wrap lines"
-    (interactive)
-    (visual-line-mode 1)
-    (diminish 'visual-line-mode))
-  (add-hook 'text-mode-hook 'my-helper-fun-line-wrap)
-#+END_SRC
-
-*** TODO Visualización de espacios en blanco (/whitespace/)
-
-*** Indentación
-
-Cuando presionamos =<TAB>= con la intención de indentar (sobre todo en archivos de código fuente), Emacs inserta por omisión el carácter tabulación =\t= y lo despliega en pantalla como si ocupara 8 espacios. Podemos modificar este comportamiento modificando dos variables: ~indent-tabs-mode~ y ~tab-width~:
-
-| Variable         | Valor      | Significado                       |
-|------------------+------------+-----------------------------------|
-| indent-tabs-mode | t          | Indentar con tabulaciones         |
-| indent-tabs-mode | nil        | Indentar con espacios             |
-|------------------+------------+-----------------------------------|
-| tab-width        | <numérico> | Ancho que ocupa =TAB= en pantalla |
-
-Para forzar a que Emacs indente utilizando cuatro espacios, utilizamos el siguiente código:
-
-#+BEGIN_SRC emacs-lisp
-  ;; indent with spaces
-
-  (setq-default indent-tabs-mode nil)
-  (setq-default tab-width 4)
-#+END_SRC
-
-Conviene aquí [[https://stackoverflow.com/a/18173666][diferenciar entre los efectos producidos]] con el uso de los comandos =setq-default= y =setq= (el más común) para fijar variables ([[https://www.gnu.org/software/emacs/manual/html_node/elisp/Default-Value.html][/symbols/ en la documentación]] de Emacs).
-
-Cuando la variable que estamos asignando es global (es decir, única y común a todos los /buffers/), =setq-default= y =setq= son equivalentes. Al contrario, cuando la variable es /buffer-local/, ocurre lo siguiente:
-
-| Comando      | Efecto en la variable                                    |
-|--------------+----------------------------------------------------------|
-| setq-default | Fija el valor de forma global (para todos los /buffers/) |
-| setq         | Fija el valor de forma local para el /buffer/ actual     |
-
-La distinción resulta relevante debido a que tanto =indent-tabs-mode= como =tab-width= tienen carácter local. Luego, cuando se observe que en un /buffer/ no se están respetando los valores que le asignamos a estas variables, es muy probable que ello se deba a que estas fueron fijadas (internamente por algún /script/) con el comando =setq=.
-
-Ver más: [[http://www.ergoemacs.org/emacs/emacs_tabs_space_indentation_setup.html][Tabs, Space, Indentation Setup]] (ErgoEmacs).
-
-*** =ws-butler= · Espacios en blanco inútiles (/blank/ y /trailing whitespace/)
-
-Los espacios en blanco a la derecha del último caracter de una línea no suelen prestar ninguna utilidad. Podemos pedirle explícitamente a Emacs que los borre ejecutando ~M-x delete-trailing-whitespace~ o bien configurarlo [[https://www.emacswiki.org/emacs/DeletingWhitespace#toc3][con el siguiente código]] para que lo haga de forma automática cada vez que guardamos el archivo:
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; always execute delete-trailing-whitespace just before saving a file
-
-  (add-hook 'before-save-hook #'delete-trailing-whitespace)
-
-  ;; alternative: execute delete-trailing-whitespace just on some files
-  ;; example: delete trailing whitespace just for C source code
-
-  (add-hook 'c-mode-hook
-            (lambda ()
-              (add-to-list 'write-file-functions
-                           'delete-trailing-whitespace)))
-#+END_SRC
-
-Otra alternativa es ejecutar ~M-x whitespace-cleanup~, función que, además de abordar en problema recién mencionado, intenta también solucionar otros mucho más complejos (como qué hacer con líneas donde aparecen espacios en blanco y tabulaciones). Podemos automatizar la ejecución de dicha función [[https://github.com/hlissner/doom-emacs/blob/eb720c86d6a88d45ee3de34911938df0baf8bb94/docs/getting_started.org#using-delete-trailing-whitespaces-or-whitespace-cleanup-to-manage-leftover-whitespace][de la siguiente forma]]:
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; execute whitespace-cleanup or delete-trailing-whitespace
-  ;; just after saving a file (we can use the before-save-hook too)
-
-  (add-hook 'after-save-hook #'whitespace-cleanup)
-  ;; or (just to show that this hook works
-  ;; with delete-trailing-whitespace too)
-  (add-hook 'after-save-hook #'delete-trailing-whitespace)
-#+END_SRC
-
-Ambas soluciones son correctas para los problemas particulares que deseamos solucionar, pero no consideran la posibilidad de que estemos trabajando con archivos distribuidos en distintas máquinas. En este caso, es probable que estemos utilizando ~git~ (o similar) para llevar un control de versiones de los archivos, escenario en el que borrar todos los espacios en blanco que no prestan utilidad podría introducir mucho ruido en nuestros /commits/.
-
-Es por lo anterior que preferimos utilizar [[https://github.com/hlissner/ws-butler][~ws-butler~]]. Este paquete se ocupa de borrar los espacios en blanco inútiles solo en las regiones del archivo que nosotros hayamos editado. Realiza esta acción además de forma silenciosa: los espacios en blanco que no parecen prestar utilidad siguen presentes en la pantalla, pero no en la copia del archivo almacenada en el disco.
-
-La idea de utilizar espacios en blanco “virtuales” (solo existentes en la pantalla) se basa en que [[https://github.com/lewang/ws-butler][el autor original de ~ws-butler~]] asume que el usuario sabe lo que está haciendo: si incluyó algunos espacios de más es porque seguramente luego piensa ocuparlos. Sería por lo tanto descortés eliminarlos del /buffer/. Pero si ocurre que aquellos espacios fueron introducidos por error, no hay problema, pues ellos no están presentes en la copia almacenada en el disco y por lo tanto no aparecerán la próxima vez que abramos el archivo ni serán incluidos en nuestros /commits/.
-
-Proponemos configurar ~ws-butler~ de la siguiente forma (inspirados en [[https://github.com/SkySkimmer/.emacs.d/blob/55404abb2a4261ad14cfc56cc67d1396e40415b1/config.org#ws-butler-unobtrusive-whitespace-remover][este código]]):
-
-#+BEGIN_SRC emacs-lisp
-  (use-package ws-butler
-    :straight
-    (ws-butler :type git
-               :host github :repo "lewang/ws-butler"
-               :fork (:host github :repo "hlissner/ws-butler"))
-    :commands
-    (ws-butler-mode)
-    :hook
-    ((prog-mode text-mode) . ws-butler-mode))
-#+END_SRC
-
-Con este código le indicamos a ~straight.el~ que deseamos instalar el [[https://github.com/raxod502/straight.el/blob/5d046ad09413f3aba6198229e392cdd3f07e77ee/README.md#integration-with-use-package][/fork/]] de ~ws-butler~ mantenido por =hlissner= (el autor de Doom Emacs) y activamos ~ws-butler-mode~ solo en dos clases de archivos: los de código fuente (~prog-mode-hook~) y los de texto habituales, como =org= o =txt= (~text-mode-hook~). Podemos ser también más específicos, reemplazando por ejemplo el /hook/ ~text-mode-hook~ por ~org-mode-hook~, dejando entonces fuera archivos como los =txt=.
-
-Qué /hook/ activar en específico dependerá de las necesidades de cada usuario. Podemos examinar estas [[https://www.gnu.org/software/emacs/manual/html_node/elisp/Basic-Major-Modes.html][jerarquías asociadas a cada modo de Emacs]] y los /hooks/ [[https://old.reddit.com/r/emacs/comments/8b8c3v/hierarchy_of_modes/][consultando]] ~C-h f <mode>~, pero para tal efecto es más fácil utilizar [[https://stackoverflow.com/a/28758074/8909331][la siguiente función recursiva]]:
-
-#+BEGIN_SRC emacs-lisp :tangle no
-(defun derived-mode-parents (mode)
-  (and mode
-    (cons mode (derived-mode-parents
-          (get mode 'derived-mode-parent)))))
-#+END_SRC
-
-Así, por ejemplo, ejecutando ~(derived-mode-parents 'org-mode)~ obtenemos =(org-mode outline-mode text-mode)= como respuesta. Esto quiere decir que ~org-mode~ es hijo de ~outline-mode~, siendo este último hijo a su vez de ~text-mode~.
-
-Notemos que también podemos configurar ~ws-butler~ para que esté activo de forma global incluyendo la instrucción ~(ws-butler-global-mode t)~ en la sección ~:commands~ de ~use-package~. También podemos explicitar qué modos nunca deben utilizar ~ws-butler~ utilizando ~ws-butler-global-exempt-modes~ (ver un ejemplo [[https://github.com/mrvdb/emacs-config/blob/d034fa42a3fe2a51da57e4f4cc595bfd630a583b/mrb.org#client-dependent-settings][aquí]]).
-
-*** Aumentar o disminuir el tamaño del tipo de letra (/zoom/)
-
-Inspirados en [[https://github.com/bbatsov/prelude/blob/7b1270848353c95e79079447d790fabb6da71210/core/prelude-global-keybindings.el#L36][este código]], podemos asignar atajos de teclado a las funciones de aumento (~text-scale-increase~) y reducción (~text-scale-decrease~) del tamaño de letra de la siguiente forma:
-
-#+BEGIN_SRC emacs-lisp
-  ;; zoom in/out text with the keyboard
-
-  (if IS-MAC
-      (progn
-        (global-set-key (kbd "s-+") 'text-scale-increase)
-        (global-set-key (kbd "s--") 'text-scale-decrease))
-    (global-set-key (kbd "C-+") 'text-scale-increase)
-    (global-set-key (kbd "C--") 'text-scale-decrease))
-#+END_SRC
-
-Diferenciamos entre macOS y otros sistemas operativos para mantener la consistencia en cada uno de ellos: en macOS, lo habitual es que las funciones de /zoom in/ y /out/ estén asociadas a la tecla =cmd= (=s= en el código), mientras que los demás sistemas operativos suelen utilizar la tecla =CTRL= (=C= en el código) para el mismo fin.
-
-*** Modos de escritura sin distracciones
-
-El modo de escritura sin distracciones de Emacs por excelencia es [[https://github.com/joostkremers/writeroom-mode][~writeroom-mode~]]. Activando este modo solo quedamos con el texto del /buffer/ activo en la pantalla (desaparece la /modeline/ y la barra barra de desplazamiento, por nombrar algunas cuestiones evidentes).
-
-Para las ocasiones en que queramos nada más que el texto del /buffer/ se ubique al centro de la pantalla, es decir, poner márgenes virtuales a ambos lados del contenido de un /buffer/, podemos utilizar [[https://github.com/rnkn/olivetti][~olivetti~]].
-
-Instalamos y configuramos ambos modos de la siguiente forma:
-
-#+BEGIN_SRC emacs-lisp
-  ;; distraction-free modes
-  ;; olivetti: simple solution (just margins around the text)
-  ;; writeroom: involved solution (no modeline, no scroll bar…)
-
-  (use-package olivetti
-    :init
-    (setq olivetti-body-width 86))
-
-  (use-package writeroom-mode
-    :config
-    (setq writeroom-width 86))
-#+END_SRC
-
-* Instalación y configuración de paquetes
-
-** Apariencia de Emacs:
-
-La configuración de la apariencia de un programa que probablemente utilicemos durante horas todos los días es extremadamente personal y sensible a caprichos. A continuación listaré algunas librerías de /skins/ (temas o /themes/) para Emacs que me parecen muy atractivas.
-
-*** Paleta de colores oscura: ~doom-oceanic-next~ y otros
-
-Las paletas de colores oscuras (/“dark mode”/) gozan de mucha popularidad y a mi gusto se ven muy bien en el contexto de edición de código fuente. Dentro del mundo de las tonalidades oscuras, una de mis /skins/ favoritas es ~doom-oceanic-next~, la que viene incluida en el paquete [[https://github.com/hlissner/emacs-doom-themes#manually][~doom-themes~]] (junto a muchas otras). Podemos instalar ~doom-themes~ y activar ~doom-oceanic-next~ de la siguiente forma:
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; https://github.com/hlissner/emacs-doom-themes#manually
-
-  (use-package doom-themes
-    :config
-    ;; Global settings (defaults)
-    (setq doom-themes-enable-bold t    ; if nil, bold is universally disabled
-          doom-themes-enable-italic t) ; if nil, italics is universally disabled
-    (load-theme 'doom-oceanic-next t)
-
-    ;; Corrects (and improves) org-mode's native fontification.
-    (doom-themes-org-config))
-#+END_SRC
-
-Todas las /skins/ de ~doom-themes~ soportan configuraciones adicionales a las aquí explicitadas para complementarse con algunos paquetes de Emacs que no instalaremos (como ~neotree~ y ~treemacs~) y que por tanto omitimos.
-
-Además, existe la posibilidad de instalar [[https://github.com/hlissner/emacs-solaire-mode][~emacs-solaire-mode~]], un paquete soportado por las /skins/ de ~doom-themes~ que nos permite destacar tenuemente el /buffer/ activo. No lo hemos considerado en esta guía.
-
-Otra /skin/ que me agrada, aunque es más áspera a la vista, es ~tango-dark~. Ella viene incluida en Emacs y podemos activarla con [[https://emacs.stackexchange.com/a/19271/26521][el siguiente código]]:
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; load the tango-dark theme
-
-  (defun load-tango-dark ()
-    "This function is simple enough to be a lambda function,
-  but using such functions on hooks is discouraged
-  because later they can't be removed."
-    (load-theme 'tango-dark))
-
-  (add-hook 'after-init-hook load-tango-dark)
-#+END_SRC
-
-*** Paleta de colores clara: ~leuven~ y otros
-
-Si planeamos utilizar Emacs para trabajar fundamentalmente con org-mode, utilizar una /skin/ de tonalidad clara podría ser una buena idea. En este caso particular recomiendo utilizar ~leuven~, /skin/ que instalamos y configuramos de la siguiente forma:
-
-#+BEGIN_SRC emacs-lisp
-  ;; theme: leuven
-
-  (use-package leuven-theme
-    :config
-    (load-theme 'leuven t))
-#+END_SRC
-
-~leuven~ es, objetivamente, una /skin/ fea, pero a la vez atractiva. Es probable que nos cause una primera impresión negativa, pero luego de trabajar un rato con ella no querremos utilizar otra /skin/ para editar nuestros archivos org.
-
-No obstante lo anterior, otra familia de /skins/ bastante atractivas son las del paquete [[https://github.com/belak/base16-emacs][~base16~]]. Este paquete [[https://belak.github.io/base16-emacs/][contiene 85 temas]], diferentes, pero todas ellos basados en los mismos 16 colores. Podemos, por ejemplo, activar la /skin/ [[https://belak.github.io/base16-emacs/#sec-1-18][~base16-atelier-savanna-light~]] de la siguiente forma:
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; theme: base-16
-
-  (use-package base16-theme
-    :config
-    (load-theme 'base16-atelier-savanna-light t))
-#+END_SRC
-
-~base16~ contiene temas muy agradables a la vista, pero lamentablemente ninguno de ellos hace distinción visual suficiente entre la prosa y los bloques de código fuente que podrían haber en un archivo org. Podemos corregir esto a mano, pero ello involucra [[https://stackoverflow.com/a/53979381/8909331][modificar los archivos fuente de los temas]], cuestión que nos podría podría demandar bastante tiempo si deseamos probar muchas combinaciones de colores.
-
-Finalmente, notemos que ~base16~ contiene temas tanto con paletas de colores claras como oscuras, pero incluí el paquete en esta sección debido a que tiene una amplia selección de paletas claras. En mi experiencia esto no es común en el mundo de Emacs, por lo que lo destaco.
-
-1.14. samples/base16-atelier-lakeside-light
-1.18. samples/base16-atelier-savanna-light
-1.20. samples/base16-atelier-seaside-light
-
-*** “Barra de estados” (/modeline/)
-
-La sola configuración de la apariencia de la barra de estado y de la información que deseamos que allí aparezca nos podría tomar varias horas. Optamos entonces por una solución pragmática: instalar y activar [[https://github.com/seagle0128/doom-modeline][~doom-modeline~]], un paquete que se ocupa de ello de forma automática con resultados que me parecen muy satisfactorios:
-
-#+BEGIN_SRC emacs-lisp
-  ;; https://github.com/seagle0128/doom-modeline#use-package
-
-  (use-package doom-modeline
-    :init
-    (doom-modeline-mode 1))
-#+END_SRC
-
-Si por alguna razón deseáramos modificar completamente la información desplegada en la /modeline/ podemos consultar [[https://dustinlacewell.github.io/emacs.d/#orgc649c25][este ejemplo]] y [[https://github.com/seagle0128/doom-modeline#faq][la documentación oficial]].
-
-** yasnippet · Expansión de texto
-
-La instalación y configuración básica de [[https://github.com/joaotavora/yasnippet/][=yasnippet=]] es muy sencilla. Con [[http://www.howardism.org/Technical/Emacs/templates-tutorial.html][el siguiente código]] activamos el paquete de forma global en Emacs y especificamos el directorio donde almacenaremos nuestras plantillas (usualmente, =~/.emacs.d/snippets/=):
-
-#+BEGIN_SRC emacs-lisp
-  (use-package yasnippet
-    :init
-    (yas-global-mode 1)
-    :config
-    (add-to-list #'yas-snippet-dirs (locate-user-emacs-file "snippets")))
-#+END_SRC
-
-No obstante lo anterior, podemos también configurar =yasnippet= con cuanto nivel de detalle deseemos (por ejemplo, para que funcione [[https://erick.navarro.io/blog/minimal-setup-for-elixir-development-in-emacs/][solo con algunos tipos de archivos]] entre [[https://old.reddit.com/r/emacs/comments/9bvawd/use_yasnippet_via_usepackage/][otras muchas alternativas]]).
-
-A las plantillas que deseamos que =yasnippet= utilice para realizar las expansiones también se les llama /snippets/. Por regla general, cada /snippet/ debe almacenarse en un archivo por separado, por lo que no puede haber más de un /snippet/ por archivo. Además, cada /snippet/ debe estar asociado a un modo de Emacs, cuestión que explicitamos utilizando carpetas. Por ejemplo:
-
-#+BEGIN_EXAMPLE
-~/.emacs.d/snippets/
-├── emacs-lisp-mode
-├── haskell-mode
-├── kotlin-mode
-├── latex-mode
-├── org-mode
-│   ├── example.yasnippet
-│   └── source.yasnippet
-└── python-mode
-#+END_EXAMPLE
-
-Dado que =yasnippet= no viene cargado con plantillas predeterminadas, debemos [[https://github.com/joaotavora/yasnippet/#where-are-the-snippets][instalarlas por separado]] o bien [[http://joaotavora.github.io/yasnippet/snippet-development.html][escribirlas nosotros mismos]]. En el primer caso, podemos consultar [[https://github.com/AndreaCrotti/yasnippet-snippets/tree/master/snippets][=yasnippet-snippets=]] o [[https://github.com/dakra/dmacs/tree/master/etc/yasnippet/snippets][=dmacs=]]. En el segundo, iniciamos el proceso ejecutando ~M-x yas-new-snippet~ o presionando =C-c & C-n=.
-
-** TODO Org-mode
-
-#+BEGIN_SRC emacs-lisp
-  ;; configure the almighty org-mode
-
-  (defun deactivate-electric-indent-local-mode ()
-    "Since Org 9.4, RET and C-j obey electric-indent-mode. This indentation is
-  fine for source code, but I find it inconvenient when writing org documents.
-  This function deactivates the electric-indent minor mode locally. We must load
-  it with the org hook."
-    (electric-indent-local-mode -1))
-
-  (use-package org
-    :defer t
-    :config
-    ;; go back to old (pre-Org 9.4) org-return behaviour (see Org 9.4 release notes)
-    (add-hook 'org-mode-hook 'deactivate-electric-indent-local-mode)
-    ;; default view when opening a file: all the headers, and only the headers
-    (setq org-startup-folded 'content)
-    ;; always leave an empty line between collapsed headers
-    (setq org-cycle-separator-lines 1)
-    ;; activate speed commands on headers
-    (setq org-use-speed-commands t)
-    ;; activate special behaviour for C-a/e and C-k on headers
-  ;; no funciona
-  ;;  (setq org-special-ctrl-a/e t
-  ;;        org-special-ctrl-k t)
-    ;; use a curved arrow instead of 3 dots to signal an invisible region
-    (setq org-ellipsis " ⤵")
-    ;; don't underline the org-ellipsis character(s)
-    (set-face-attribute 'org-ellipsis nil :underline nil)
-    ;; deal with edits on invisible regions in a smart way
-    (setq org-catch-invisible-edits 'smart)
-    ;; never hide the emphasis markers (for example, slashes for italics)
-    (setq org-hide-emphasis-markers nil)
-    ;; how to display LaTeX images (math)
-    ;; C-c C-x C-l (org-latex-preview) <-- show/hide equation next to point
-    ;; C-u C-c C-x C-l <-- show/hide equations in current section
-    ;; C-u C-u C-c C-x C-l <-- show/hide equations in the current document
-    (setq org-format-latex-options (plist-put org-format-latex-options :scale 1.8)
-          org-format-latex-options (plist-put org-format-latex-options :foreground "Black")
-          org-format-latex-options (plist-put org-format-latex-options :background "White")
-          org-format-latex-options (plist-put org-format-latex-options :html-foreground "Black")
-          org-format-latex-options (plist-put org-format-latex-options :html-background "Transparent")
-          org-format-latex-options (plist-put org-format-latex-options :html-scale 1.0))
-    ;; bypass org-babel confirmation for evaluating the listed languages
-    (defun my-org-confirm-babel-evaluate (lang body)
-      (not (member lang '("python" "R"))))
-    (setq org-confirm-babel-evaluate #'my-org-confirm-babel-evaluate)
-    ;; tell org-babel which languages it should be aware of
-    ;; nil para desactivar, t para activar
-    (org-babel-do-load-languages
-     'org-babel-load-languages
-     '((R . nil)
-       (python . t)
-       (emacs-lisp . t)))
-  ;;  :bind
-  ;;  (:map org-mode-map
-  ;;        ("C-a" . org-beginning-of-line)
-  ;;        ("C-e" . org-end-of-line)
-  ;;        ("C-k" . org-kill-line))
-    )
-#+END_SRC
-
-- plist: https://lists.gnu.org/archive/html/emacs-orgmode/2013-09/msg00769.html
-- ejecutar bloques de códigos Babel sin confirmación de seguridad: https://emacs.stackexchange.com/a/21128/26521
-
-  #+BEGIN_SRC emacs-lisp :tangle no
-    ;; mostrar/ocultar imágenes en org
-    ;; también:
-    ;; C-c C-x C-v <-- mostrar/ocultar imágenes
-    ;; C-c C-x M-v <-- volver a cargar todas las imágenes
-  #+END_SRC
-
-** TODO Entornos virtuales
-
-Útil para org-babel.
-
-#+BEGIN_SRC emacs-lisp
-  ;; https://emacs.stackexchange.com/a/20093/26521
-  ;; https://ddavis.io/posts/emacs-python-lsp/
-  (use-package pyvenv
-    :config
-    (setenv "WORKON_HOME" (expand-file-name "~/miniconda3/envs/"))
-    (pyvenv-mode 1))
-  ;; M-x pyvenv-workon
-  ;; M-x pyvenv-deactivate
-#+END_SRC
-
-Notar que al ejecutar código Python, Emacs me advierte de lo siguiente:
-
-#+BEGIN_EXAMPLE
-  Warning (python): Your ‘python-shell-interpreter’ doesn’t seem to support readline, yet ‘python-shell-completion-native-enable’ was t and "python" is not part of the ‘python-shell-completion-native-disabled-interpreters’ list.  Native completions have been disabled locally.
-#+END_EXAMPLE
-
-Alternativa que no he probado: =conda.el= ([[https://github.com/necaris/conda.el][GitHub]]).
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; https://stackoverflow.com/a/56722815/8909331
-  ;; https://martinralbrecht.wordpress.com/2020/08/23/conda-jupyter-and-emacs/
-  (use-package conda
-    :custom
-    (conda-anaconda-home (expand-file-name "~/miniconda3/"))
-    (conda-env-home-directory (expand-file-name "~/miniconda3/")))
-#+END_SRC
-
-** TODO company-mode
-
-Para completar instrucciones al programar. No lo he probado. [[https://company-mode.github.io/][Sitio web.]]
-
-** TODO Org-pomodoro
-
-- https://github.com/marcinkoziej/org-pomodoro
-- https://old.reddit.com/r/emacs/comments/5ayjjl/pomodoro_in_emacs/
-- https://ladicle.com/post/config/
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; pomodoro technique for org
-
-  (use-package org-pomodoro
-    :after (org)
-    :commands (org-pomodoro)
-    :config
-    (customize-set-variable 'org-pomodoro-manual-break t)
-    (customize-set-variable 'org-pomodoro-keep-killed-pomodoro-time t)
-    (defun dn/org-pomodoro-clock-in-last ()
-      (interactive)
-      (org-pomodoro '(16)))
-    :bind
-    (:map org-mode-map
-          ([f8] . org-pomodoro)
-          ([f9] . dn/org-pomodoro-clock-in-last)))
-#+END_SRC
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; https://gist.github.com/jstewart/7664823
-
-  ;; Needs terminal-notifier (brew install terminal-notifier)
-  (defun notify-osx (title message)
-    (call-process "terminal-notifier"
-                  nil 0 nil
-                  "-group" "Emacs"
-                  "-title" title
-                  "-sender" "org.gnu.Emacs"
-                  "-message" message))
-
-  ;; org-pomodoro mode hooks
-  (add-hook 'org-pomodoro-finished-hook
-            (lambda ()
-              (notify-osx "Pomodoro completed!" "Time for a break.")))
-
-  (add-hook 'org-pomodoro-overtime-hook
-            (lambda ()
-              (notify-osx "Pomodoro entered overtime!" "Time for a break!")))
-
-  (add-hook 'org-pomodoro-break-finished-hook
-            (lambda ()
-              (notify-osx "Short break finished" "Ready for another?")))
-
-  (add-hook 'org-pomodoro-long-break-finished-hook
-            (lambda ()
-              (notify-osx "Long break finished" "Ready for another?")))
-
-  (add-hook 'org-pomodoro-killed-hook
-            (lambda ()
-              (notify-osx "Running pomodoro was killed")))
-#+END_SRC
-
-** TODO Org-roam
-
-*** Cuestiones previas
-
-Org-roam utiliza una base de datos sqlite para almacenar la metadata de nuestros archivos Roam.
-
-Antes de instalar Org-roam debemos asegurarnos de que Emacs [[https://www.orgroam.com/manual/Post_002dInstallation-Tasks.html][tenga acceso al ejecutable de sqlite]], lo que podemos verificar evaluando la siguiente instrucción:
-
-#+BEGIN_SRC emacs-lisp :tangle no
-  ;; is the sqlite binary visible to Emacs?
-
-  (executable-find "sqlite3")
-#+END_SRC
-
-Si obtenemos como respuesta la ruta a una carpeta, entonces Emacs tuvo éxito accediendo al ejecutable.
-
-*** Configuración
-
-Instalamos y configuramos [[https://github.com/org-roam/org-roam][Org-roam]] con el siguiente código:
-
-#+BEGIN_SRC emacs-lisp
-  ;; Org-roam: a Roam Research clone that implements a Zettelkasten
-
-  (use-package org-roam
-    :hook
-    (after-init . org-roam-mode)
-    :custom
-    (org-roam-directory
-     (expand-file-name
-      (file-name-as-directory "~/org/Zettelkasten")))
-    (org-roam-completion-system 'ivy)
-    (org-roam-buffer-position 'right)
-    (org-roam-buffer-width 0.33)
-    :bind
-    (:map org-roam-mode-map
-     ("C-c n b" . org-roam)
-     ("C-c n f" . org-roam-find-file-immediate)
-     :map org-mode-map
-     ("C-c n i" . org-roam-insert)
-     ("C-c n I" . org-roam-insert-immediate)))
-#+END_SRC
-
-**** TODO reescribir
-
-Notemos que debemos asignar el valor de ~org-roam-directory~ [[https://www.orgroam.com/manual/Getting-Started.html][antes de que cargue Org-roam]]. La configuración arriba especificada ya considera esto.
-
-Otra tarea que debemos ejecutar muy al comienzo (de hecho, [[https://www.orgroam.com/manual/Getting-Started.html][inmediatamente luego de iniciar Emacs]]) es la de actualizar el caché de Org-roam y verificar el estado de la base de datos. Logramos esto con el /hook/ ~(add-hook 'after-init-hook 'org-roam-mode)~ (representado por ~(after-init . org-roam-mode)~ utilizando la sintaxis de use-package). Sumado a lo anterior, podemos también actualizar el caché de forma manual con ~M-x org-roam-db-build-cache~.
-
-Además de ~org-roam-directory~, existen 2 variables relacionadas con directorios más que podemos configurar: ~org-roam-db-location~ y ~org-roam-file-exclude-regexp~. Encontramos información sobre ellas [[https://www.orgroam.com/manual/Directories-and-Files.html][aquí]].
-
-Finalmente, la asignación de [[https://www.orgroam.com/manual/The-Org_002droam-Buffer.html][las variables asociadas a los /buffers/ de Org-roam]] nos aseguran que ellos siempre se deben abrir a la derecha del /buffer/ activo y que deben ocupar 1/3 del ancho de la ventana.
-
-***** Configuración de Doom
-
-[[https://github.com/hlissner/doom-emacs/blob/1cc060c928677f783720536e5bbd930a9d730d84/modules/lang/org/contrib/roam.el][Aquí]].
-
-*** Uso básico
-
-Para crear una nota ejecutamos ~M-x org-roam-find-file~.
-
-*** Ordenar el siguiente contenido
-
-**** Uso básico
-
-- Crear una nueva nota: ~M-x org-roam-find-file~. Lo hace a través de org-capture ([[https://www.orgroam.com/manual/The-Templating-System.html][información para configurar la plantilla]]).
-- Enlazar notas: ~M-x org-roam-insert~.
-- Mostrar la lista de notas que enlazan a la activa: ~M-x org-roam~.
-- Borrar una nota (los enlaces a la nota en cuestión quedarán huérfanos): ~M-x delete-file~ y luego ~M-x org-roam-db-build-cache~ ([[https://org-roam.discourse.group/t/any-recommended-methodology-to-delete-an-org-roam-file/54][fuente]]).
-
-**** Elementos de una nota
-
-***** Títulos
-
-Una nota puede tener múltiples títulos, los que podemos indicar con las propiedades ~#+title~, ~#+roam_alias~ (entre comillas dobles; para múltiples alias, los separamos usando espacios) o el primer encabezado de la nota.
-
-Ejemplo:
-
-#+BEGIN_EXAMPLE
-  ,#+title: World War 2
-  ,#+roam_alias: "WWII" "World War II"
-
-  ,* Headline
-
-  Text of the note
-#+END_EXAMPLE
-
-Controlamos la precedencia de estos títulos con ~org-roam-title-sources~. Los métodos que allí debemos listar nos entregarían los siguientes resultados para nuestro ejemplo:
-
-| Método    | Resultado                |
-|-----------+--------------------------|
-| 'title    | '("World War 2")         |
-| 'headline | '("Headline")            |
-| 'alias    | '("WWII" "World War II") |
-
-[[https://www.orgroam.com/manual/Titles.html][Más información]].
-
-***** Etiquetas
-
-Las indicamos principalmente con la propiedad ~#+roam_tags~. También podemos utilizar la estructura de carpetas donde se almacena la nota como etiquetas.
-
-Por omisión, org-roam solo utilizará la información disponible en la propiedad ~#+roam_tags~. Podemos cambiar este comportamiento con la variable ~org-roam-tag-sources~.
-
-[[https://www.orgroam.com/manual/Tags.html][Más información]].
-
-***** Referencias
-
-Podemos mencionar solo una referencia por nota y lo hacemos con la propiedad ~#+roam_key~. Es de utilidad, por ejemplo, para enlazar una nota con un /paper/. En este caso, asignamos la palabra clave asociada al paper en el bibtex al que accedemos con org-ref.
-
-[[https://www.orgroam.com/manual/File-Refs.html][Más información]].
-
-**** Plantillas
-
-Basadas en org-capture, pero incompatibles con ellas. Las configuramos con ~org-roam-capture-templates~. Podemos crear múltiples plantillas; si tenemos más de una, org-roam nos preguntará cuál usar cada vez que creemos una nueva nota.
-
-Podemos ver un ejemplo de la estructura de una plantilla [[https://www.orgroam.com/manual/Template-Walkthrough.html][aquí]]. Para conocer sobre las variables de expansión de org-roam (incompatibles con org-capture), podemos ver [[https://www.orgroam.com/manual/Org_002droam-Template-Expansion.html][esto]]. Accedemos a la documentación de la expansión de variables propias de org-capture [[https://orgmode.org/manual/Template-expansion.html][aquí]].
-
-[[https://www.orgroam.com/manual/The-Templating-System.html][Más información]].
-
-**** Enlazar notas
-
-Podemos enlazar archivos vía ~file~ (utilizando ~org-roam-insert~) o encabezados específicos dentro de los archivos vía ~id~ (utilizando ~org-insert-link~ previa creación de la ID llamando a ~org-store-link~ en el encabezado que deseamos guardar).
-
-También podemos utilizar el sistema de enlaces proporcionado por org-roam:
-
-- Enlace a un archivo de org-roam con el título o alias ~title~:
-
-#+BEGIN_EXAMPLE
-[[roam:title]]
-#+END_EXAMPLE
-
-- Enlace al encabezado ~headline~ del archivo actual:
-
-#+BEGIN_EXAMPLE
-[[roam:*headline]]
-#+END_EXAMPLE
-
-- Enlace al encabezado ~headline~ del archivo con título o alias ~title~:
-
-#+BEGIN_EXAMPLE
-[[roam:title*headline]]
-#+END_EXAMPLE
-
-[[https://www.orgroam.com/manual/Inserting-Links.html][Más información]].
-
-**** Índice
-
-Cuando ya tenemos una masa crítica de notas que requieren una guía que nos permita navegarla, podemos utilizar un índice. Indicamos la ubicación y nombre del archivo índice con la variable ~org-roam-index-file~.
-
-[[https://www.orgroam.com/manual/Index-File.html][Más información]].
-
-**** Encriptación
-
-Podemos encriptar nuestras notas asignando ~t~ a la variable ~org-roam-encrypt-files~. La encriptación en sí es manejada por Emacs. Notemos que, de vez en cuando, Emacs nos podría pedir la clave de nuestros archivos, imagino que aún cuando no estemos trabajando con ellos. En estos casos es probable que org-roam esté actualizando su base de datos (verificar que sea así, de otro modo podría ser un virus).
-
-[[https://www.orgroam.com/manual/Encryption.html][Más información]].
-
-**** Org-Roam protocol
-
-Comunicación entre Emacs y los navegadores web. Configurarlo requiere mucho trabajo, por lo que no lo he probado.
-
-[[https://www.orgroam.com/manual/Roam-Protocol.html][Más información]].
-
-**** Visualización de las conexiones entre notas
-
-***** Generación de imagen
-
-Org-roam nos permite visualizar el grafo que representa las conexiones entre notas.
-
-[[https://www.orgroam.com/manual/Graphing.html][Más información]].
-
-***** Interacción con el grafo (servidor)
-
-Podemos visualizar el grafo en un navegador web de forma interactiva utilizando [[https://github.com/org-roam/org-roam-server][org-roam-server]]. Para poder abrir las notas desde el navegador en Emacs debemos antes haber configurado Org-Roam protocol.
-
-[[https://github.com/org-roam/org-roam-server][Más información]].
-
-**** Configurar el /framework/ de completación
-
-Debemos hacerlo explícitamente. Por ejemplo, para configurar Ivy:
-
-#+BEGIN_SRC emacs-lisp :tangle no
-(setq org-roam-completion-system 'ivy)
-#+END_SRC
-
-[[https://www.orgroam.com/manual/Org_002droam-Completion-System.html][Más información]].
-
-**** Solucionar inconsistencias en los archivos
-
-Podemos solucionar problemas como enlaces rotos utilizando ~org-roam-doctor~.
-
-[[https://www.orgroam.com/manual/Diagnosing-and-Repairing-Files.html][Más información]].
-
-**** Recolector de basura
-
-Podemos cambiar temporalmente cómo se comporta el recolector de basura utilizando ~org-roam-db-gc-threshold~.
-
-[[https://www.orgroam.com/manual/Garbage-Collection.html][Más información]].
-
-**** Ecosistema
-
-[[https://www.orgroam.com/manual/Ecosystem.html][Más información]].
-
-**** Citas bibliográficas
-
-Org-Roam-bibtex busca poder compenetrar org-roam con org-ref. El estado de este paquete es /alpha/, por lo que a priori no es recomendable usarlo.
-
-[[https://github.com/org-roam/org-roam-bibtex][Más información]].
-
-* TODO Otros
-
-** Org
-
-*** Encriptación
-
-- https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L27 y https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L49
-- https://orgmode.org/manual/Org-Crypt.html
-- https://orgmode.org/worg/org-tutorials/encrypting-files.html
-- https://old.reddit.com/r/emacs/comments/7jhcq8/authinfogpg/
-
-*** Tabla de contenidos
-
-- https://github.com/snosov1/toc-org
-- https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L58
-
-*** Indentación
-
-- https://orgmode.org/manual/Org-Indent-Mode.html
-- https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L57
-
-*** Apariencia
-
-- https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L119
-
-*** Atajos con Evil
-
-- https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L180
-
-*** Hacks
-
-- https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L241
-
-*** Recentf
-
-- https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L259
-
-** markdown
-
-Sitio [[https://jblevins.org/projects/markdown-mode/][web]].
-
+#+name: current-date-time-iso8601
 #+begin_src emacs-lisp
-  (use-package markdown-mode
-    :ensure t
-    :commands (markdown-mode gfm-mode)
-    :mode (("README\\.md\\'" . gfm-mode)
-           ("\\.md\\'" . markdown-mode)
-           ("\\.markdown\\'" . markdown-mode))
-    :init (setq markdown-command "multimarkdown"))
+  ;; función para insertar timestamp actual
+  (defun dn/current-timestamp ()
+    " Inserta la fecha y hora actual en formato ISO 8601 con T como
+  separador y sin especificar microsegundos. "
+    (interactive)
+    (insert (format-time-string "%Y-%m-%dT%H:%M:%S%:z")))
 #+end_src
 
-** activitywatch
-
-Sitio [[https://github.com/pauldub/activity-watch-mode][web]] del modo mayor para Emacs.
-
-#+begin_src emacs-lisp :tangle no
-  (use-package activity-watch-mode
-    :init
-    (global-activity-watch-mode))
-#+end_src
-
-
-** Emacs
-
-*** Seguridad
-
-- https://github.com/hlissner/doom-emacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L212
-
-*** Encriptación
-
-- https://www.masteringemacs.org/article/keeping-secrets-in-emacs-gnupg-auth-sources
-- https://github.com/hlissner/doom-emacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L238
-
-*** “Limpieza”
-
-- https://github.com/hlissner/doom-emacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L244
-
-*** Optimizaciones
-
-Todo aquí (líneas 299 a 264): https://github.com/hlissner/doom-emacs/blob/29b12de83e5f8ce76e9ff38549753c69bc507650/core/core.el#L299
-
-- Soportar solo textos de izquierda a derecha (a menos que alguna vez vayamos a trabajar con textos en árabe)
-- No preocuparse de los cursores y elementos destacados en los /buffers/ inactivos
-- /Scrolling/ rápido (aunque impreciso)
-- Impedir que los /frames/ cambien de tamaño de forma automática dependiendo del contenido
-- No hacer /pings/ a menos que nosotros lo pidamos
-- No comprimir cachés de tipografías (usa más memoria, pero es más rápido)
-- Algunas optimizaciones específicas para cada sistema operativo (cuestiones de línea de comandos)
-- Aumentar el tamaño del basurero y pedirle al recolector que solo pase cuando Emacs esté desatendido
-  - Otra configuración con respecto al recolector: https://github.com/bbatsov/prelude/blob/0a062e74de49c225eef5ed496adf45f93158ec9c/init.el#L94
-- Evitar que tty cargue al comienzo
-
-*** Seguir enlaces simbólicos
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L59
-
-*** Aspectos de formato
-
-Desde la línea 109 a la 154: https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L109
-
-- Reemplazar tabs por espacios
-- Tabulaciones al comienzo de una línea indentan; en otros lados insertarn ~\t~
-- Permitir que las tabs solo indenten (no pueden aparecer en medio de una línea)
-- Ancho máximo de las columnas
-- Word y line wrap (para código y texto por separado)
-- Variable rara sobre el término de una oración (¿dos espacios?)
-- Insertar una línea vacía al final del archivo
-
-*** UTF8 en el portapapeles
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L166
-
-*** Configuración de autorevert
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L183
-
-*** Configuración de recentf
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L221
-
-*** Paréntesis
-
-- https://github.com/Fuco1/smartparens
-- https://emacs.stackexchange.com/questions/56071/smartparens-does-not-work-well-in-orgmode
-- https://github.com/hlissner/doom-emacs/blob/master/modules/lang/org/config.el#L86
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L449
-
-*** Evitar que Emacs se quede pegado cuando la longitud de las líneas es demasiado grande (so-long)
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-editor.el#L515
-
-*** Evitar que package.el modifique init.el
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-packages.el#L68
-
-*** Configuración extra de straight.el
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-packages.el#L78
-
-*** Botón del medio del mouse pega donde está el cursor, no donde se hizo click
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-ui.el#L171
-
-*** Scrolling
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-ui.el#L181
-
-*** Que el cursor no parpadee (si parpadea, podríamos encontrar problemas con paquetes como treemacs)
-
-- https://github.com/hlissner/doom-emacs/blob/b6fe731153f48d77cd78914dc67a72bcdcbb090a/core/core-ui.el#L207
-
-*** Evil
-
-- https://dawranliou.com/blog/from-vim-to-emacs/
-- https://github.com/noctuid/evil-guide
-- https://old.reddit.com/r/emacs/comments/726p7i/evil_mode_and_use_package/
-
-#+BEGIN_SRC emacs-lisp
-  ;; https://www.youtube.com/watch?v=Uz_0i27wYbg
-  ;; https://ryan.himmelwright.net/post/emacs-update-evil-usepackage/
-  ;; https://teddit.net/r/emacs/comments/esi403/straightel_usepackage_evil_not_running_config/
-  ;; https://teddit.net/r/emacs/comments/726p7i/evil_mode_and_use_package/
-  ;; https://teddit.net/r/emacs/comments/9ctvmo/evilorgmode/
-  ;; https://github.com/Somelauw/evil-org-mode
-
-  ;; evil packages/plug-ins
-  ;; https://github.com/syl20bnr/spacemacs/blob/b6aed092cf1de8992522d69c8158a20df880a84e/layers/%2Bspacemacs/spacemacs-evil/packages.el#L12
-  ;; https://www.emacswiki.org/emacs/Evil#h5o-6
-  ;; https://github.com/hlissner/doom-emacs/tree/235c386368f0814671131d0d77e32be450c92cbc/modules/editor/evil#plugins
-
-  (use-package evil-leader
-    :config
-    (global-evil-leader-mode 1)
-    (evil-leader/set-leader "º")
-    (evil-leader/set-key
-     "b" 'ivy-switch-buffer
-     "f" 'find-file
-     "r" 'recentf-open-files
-     "o" 'other-window))
-
-
-  ;; https://github.com/emacs-evil/evil-surround
-  (use-package evil-surround
-    :config
-    (global-evil-surround-mode 1))
-
-
-  ;; https://github.com/emacs-evil/evil
-  (use-package evil
-    :after (evil-leader)
-    :init
-    ;; https://evil.readthedocs.io/en/latest/settings.html
-    (setq evil-vsplit-window-right t
-          evil-split-window-below t
-          evil-undo-system 'undo-fu) ;; no funciona
-    :config
-    (evil-mode 1))
-
-
-  ;; http://vimcasts.org/episodes/swapping-two-regions-of-text-with-exchange-vim/
-  (use-package evil-exchange
-    ;; init: spacemacs config:
-    ;; https://github.com/syl20bnr/spacemacs/blob/b6aed092cf1de8992522d69c8158a20df880a84e/layers/%2Bspacemacs/spacemacs-evil/packages.el#L134
-    :init
-    (progn
-      (let ((evil-exchange-key (kbd "gx"))
-            (evil-exchange-cancel-key (kbd "gX")))
-        (define-key evil-normal-state-map evil-exchange-key 'evil-exchange)
-        (define-key evil-visual-state-map evil-exchange-key 'evil-exchange)
-        (define-key evil-normal-state-map evil-exchange-cancel-key 'evil-exchange-cancel)
-        (define-key evil-visual-state-map evil-exchange-cancel-key 'evil-exchange-cancel))))
-
-
-  ;; https://github.com/Somelauw/evil-org-mode/
-  (use-package evil-org
-    :after (evil org)
-    :hook (org-mode . evil-org-mode)
-    :config
-    ;; navigation: https://github.com/Somelauw/evil-org-mode/blob/a629fb705b0ac704580d5a5833a64716284074e7/evil-org.el#L680
-    (evil-org-set-key-theme '(textobjects additional todo)))
-
-  (use-package evil-unimpaired
-    :straight
-    (evil-unimpaired :type git
-                     :host github :repo "zmaas/evil-unimpaired")
-    :config
-    (evil-unimpaired-mode))
-
-  ;; para separar los portapapeles: Emacs/Evil y el sistema manejan
-  ;; registros distintos
-  ;; así, cmd-c/x/v trabajan por separado de los yank y put de Emacs/Evil
-  (use-package simpleclip
-    :config
-    (simpleclip-mode 1))
-
-  ;; para aumentar o disminuir un contador
-  ;; 2022-07-26
-  (use-package evil-numbers
-    :config
-    (evil-define-key '(normal visual) 'global (kbd "C-c +") 'evil-numbers/inc-at-pt)
-    (evil-define-key '(normal visual) 'global (kbd "C-c -") 'evil-numbers/dec-at-pt))
-
-
-  ;; considerar instalar después
-  ;; https://github.com/cute-jumper/evil-embrace.el
-  ;; https://github.com/syl20bnr/evil-escape
-  ;; https://github.com/edkolev/evil-lion
-  ;; https://github.com/redguardtoo/evil-nerd-commenter
-  ;; https://github.com/hlissner/evil-snipe
-#+END_SRC
-
-** scroll suave
-
-#+name: good-scroll
-#+begin_src emacs-lisp :tangle no
-  ;; https://www.reddit.com/r/emacs/comments/kgr3uz/goodscrollel_attempt_at_good_pixelbased_smooth/gghs5wv/
-  (use-package good-scroll
-    :straight
-    (good-scroll :type git
-                 :host github :repo "io12/good-scroll.el")
-    :custom
-    (good-scroll-algorithm 'good-scroll-linear)
-    :hook
-    (after-init . good-scroll-mode))
-#+end_src
